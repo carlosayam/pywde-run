@@ -532,7 +532,7 @@ def hellinger_distance(dist, dist_est):
         pred_vals = dist_est.pdf(grid)
     #print('WDE:', pred_vals.mean())
     corr_factor = pred_vals.mean()
-    print('corr factor = %g' % corr_factor)
+    # print('corr factor = %g' % corr_factor)
     pred_vals = pred_vals / corr_factor
     pred_vals = np.sqrt(pred_vals)
     diff = pdf_vals - pred_vals
@@ -662,10 +662,12 @@ def gen_samples(dist_code, num_obvs):
     """
     Generates 50 samples for given distribution and number of observations
     in each sample.
+
+    1000-6000 <~ 5 mins to generate 50 samples
     """
     dist = dist_from_code(dist_code)
-    for ix in range(NUM_SAMPLES):
-        dest = sample_name(dist_code, num_obvs, ix+1)
+    for ix in range(1, NUM_SAMPLES + 1):
+        dest = sample_name(dist_code, num_obvs, ix)
         data = dist.rvs(num_obvs)
         save_data(data, dest)
 
@@ -676,26 +678,26 @@ def gen_samples(dist_code, num_obvs):
 @click.argument('sample_no', type=int, default='0')
 def calc_kde(dist_code, num_obvs, sample_no):
     """
-    Calculates KDE
-    :param dist_code:
-    :param num_obvs:
-    :param sample_no:
-    :return:
+    Calculates KDE.
+
+    1000, 2000 <~ 20 secs each sample
+    3000, 4000 <~ 90 secs each sample
+    5000, 6000 <~ 180 secs each sample
     """
     def gen():
         for ix in sample_range:
-            source = sample_name(dist_code, num_obvs, ix+1)
+            source = sample_name(dist_code, num_obvs, ix)
             data = read_data(source)
             assert data.shape[0] == num_obvs
             t0 = datetime.now()
             kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
             elapsed = (datetime.now() - t0).total_seconds()
-            hd, corr_factor = hellinger_distance_wip(dist, kde)
+            hd, corr_factor = hellinger_distance(dist, kde)
             yield result_kde(dist_code, num_obvs, sample_no, hd, elapsed)
 
     dist = dist_from_code(dist_code)
     if sample_no == 0:
-        sample_range = range(NUM_SAMPLES)
+        sample_range = range(1, NUM_SAMPLES + 1)
         result_file = results_name(dist_code, num_obvs, 0, 'kde')
     else:
         sample_range = [sample_no]
@@ -720,7 +722,7 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     """
     def gen():
         for ix, k, j0, delta_j in itt.product(sample_range, k_range, j0_range, delta_j_range):
-            source = sample_name(dist_code, num_obvs, ix+1)
+            source = sample_name(dist_code, num_obvs, ix)
             data = read_data(source)
             assert data.shape[0] == num_obvs
             t0 = datetime.now()
@@ -762,7 +764,7 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         what = what + ('.delta_j_%d' % delta_j)
     what = wave_name + '-' + what
     if sample_no == 0:
-        sample_range = range(NUM_SAMPLES)
+        sample_range = range(1, NUM_SAMPLES + 1)
         result_file = results_name(dist_code, num_obvs, 0, what)
     else:
         sample_range = [sample_no]
