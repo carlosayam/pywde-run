@@ -1,0 +1,10 @@
+#!/bin/bash
+WTIME=$1
+shift
+_RET=$(getopt --shell sh --options "" -- -- "$@") && export _RET=${_RET# --}
+
+mkdir -p $HOME/RESP/job.output
+cd $HOME/RESP/job.output
+
+echo plan.bs $_RET
+qsub -l walltime=$WTIME -N JOB -v _RET plan.pbs

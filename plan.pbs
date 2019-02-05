@@ -1,0 +1,27 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1
+#PBS -l vmem=4gb
+
+restore_array() {
+   local name="$1" payload="$2"
+   eval set -- "$payload"
+   eval "unset $name && $name=("\$@")"
+}
+
+restore_array VARS "$_RET"
+
+module purge
+module add python/3.6.5
+
+RESP_DIR="$PBS_O_HOME/RESP"
+SW_DIR="$PBS_O_HOME/WDE/pywde-run"
+
+mkdir -p $RESP_DIR/
+cd $RESP_DIR
+
+. $SW_DIR/.venv/bin/activate
+export PYTHONPATH=$SW_DIR
+export LC_ALL=en_AU.utf8
+export LANG=en_AU.utf8
+python3 $SW_DIR/runit.py "${VARS[@]}"
+
