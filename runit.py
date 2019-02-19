@@ -12,6 +12,7 @@ import numpy as np
 import scipy.integrate as integrate
 
 from dist_codes import dist_from_code
+from common import *
 from pywde.square_root_estimator import WaveletDensityEstimator
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 
@@ -72,37 +73,6 @@ def hellinger_distance(dist, dist_est):
     return err, corr_factor
 
 
-ROOT_DIR = pathlib.Path('RESP')
-NUM_SAMPLES = 100
-
-def fname(what, dist_name, num=None, wave_name=None, delta_j=None, ext='.png'):
-    strn = '%04d' % num if num is not None else None
-    strd = '%d' % delta_j if delta_j is not None else None
-    strs = [dist_name, what, strn, wave_name, strd]
-    strs = [v for v in strs if v]
-    return '%s/%s%s' % (ROOT_DIR, '-'.join(strs), ext)
-
-
-def ensure_dir(a_path):
-    if not a_path.exists():
-        os.makedirs(a_path.absolute())
-    return a_path
-
-
-def base_dir(dist_name, num_obvs):
-    return ensure_dir(ROOT_DIR / dist_name / ('%04d' % num_obvs))
-
-
-def sample_name(dist_name, num_obvs, sample_no):
-    filename = 'sample-%02d.tab' % sample_no
-    path = ensure_dir(base_dir(dist_name, num_obvs) / 'samples') / filename
-    return path.absolute()
-
-
-def results_name(dist_name, num_obvs, sample_no, what):
-    filename = '%s-%02d.tab' % (what, sample_no)
-    path = ensure_dir(base_dir(dist_name, num_obvs) / 'results') / filename
-    return path.absolute()
 
 
 Result = namedtuple('Result', [
@@ -115,11 +85,12 @@ Result = namedtuple('Result', [
     'delta_j',
     'loss',
     'ordering',
+    'is_single',
     'hd',
     'params',
     'elapsed_time'
 ])
-Result.__new__.__defaults__ = ('', 0, 0, '', 0, 0, '', '', 0.0, 0, 0.0)
+Result.__new__.__defaults__ = ('', 0, 0, '', 0, 0, '', '', True, 0.0, 0, 0.0)
 
 
 def result_kde(dist_code, num_obvs, sample_no, hd, elapsed):
@@ -147,7 +118,7 @@ def result_wde_classic(dist_code, num_obvs, sample_no, wave_name, k, delta_j, pa
         elapsed_time=elapsed
     )
 
-def result_wde_cv(dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, hd, elapsed):
+def result_wde_cv(dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, is_single, hd, elapsed):
     return Result(
         dist_code=dist_code,
         num_obvs=num_obvs,
@@ -159,6 +130,7 @@ def result_wde_cv(dist_code, num_obvs, sample_no, wave_name, k, delta_j, params,
         params=params,
         loss=loss,
         ordering=ordering,
+        is_single=is_single,
         hd=hd,
         elapsed_time=elapsed
     )
@@ -202,6 +174,9 @@ def gen_samples(dist_code, num_obvs):
         dest = sample_name(dist_code, num_obvs, ix)
         data = dist.rvs(num_obvs)
         save_data(data, dest)
+        print('.', end='')
+        sys.stdout.flush()
+    print()
 
 
 @main.command()
@@ -264,13 +239,13 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
             hd, corr_factor = hellinger_distance(dist, wde)
             params = wde.pdf.nparams
             yield result_wde_classic(dist_code, num_obvs, ix, wave_name, k, delta_j, params, hd, elapsed)
-            for loss, ordering in WaveletDensityEstimator.valid_options():
+            for loss, ordering, is_single in WaveletDensityEstimator.valid_options():
                 t0 = datetime.now()
-                wde.cvfit(data, loss, ordering)
+                wde.cvfit(data, loss, ordering, is_single=is_single)
                 elapsed = (datetime.now() - t0).total_seconds()
                 hd, corr_factor = hellinger_distance(dist, wde)
                 params = wde.pdf.nparams
-                yield result_wde_cv(dist_code, num_obvs, ix, wave_name, k, delta_j, params, loss, ordering, hd, elapsed)
+                yield result_wde_cv(dist_code, num_obvs, ix, wave_name, k, delta_j, params, loss, ordering, is_single, hd, elapsed)
 
 
 

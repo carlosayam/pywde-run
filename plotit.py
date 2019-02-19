@@ -15,6 +15,7 @@ from scipy.interpolate import LinearNDInterpolator
 
 import matplotlib.pyplot as plt
 from dist_codes import dist_from_code
+from common import *
 from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from pywde.square_root_estimator import WaveletDensityEstimator
@@ -50,7 +51,7 @@ def plot_dist(fname, dist):
     ax.plot_surface(xx, yy, zz / zz_sum, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
     ax.set_title(dist.code)
     ax.set_zlim(0, 1.1 * max_v)
-    #plt.show()
+    plt.show()
     plt.savefig(fname)
     plt.close()
     print('%s saved' % fname)
@@ -68,7 +69,7 @@ def do_plot_wde(wde, fname, dist):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
-    ax.set_title(wde.name + ('\nHD = %g' % hd))
+    ax.set_title(wde.name + ('\nHD = %g' % hd), wrap=True)
     ax.set_zlim(0, zlim)
     plt.savefig(fname)
     plt.close()
@@ -162,38 +163,6 @@ def hellinger_distance(dist, dist_est):
     return err, corr_factor
 
 
-ROOT_DIR = pathlib.Path('RESP')
-NUM_SAMPLES = 50
-
-def fname(what, dist_name, num=None, wave_name=None, delta_j=None, ext='.png'):
-    strn = '%04d' % num if num is not None else None
-    strd = '%d' % delta_j if delta_j is not None else None
-    strs = [dist_name, what, strn, wave_name, strd]
-    strs = [v for v in strs if v]
-    return '%s/%s%s' % (ROOT_DIR, '-'.join(strs), ext)
-
-
-def ensure_dir(a_path):
-    if not a_path.exists():
-        os.makedirs(a_path.absolute())
-    return a_path
-
-
-def base_dir(dist_name, num_obvs):
-    return ensure_dir(ROOT_DIR / dist_name / ('%04d' % num_obvs))
-
-
-def sample_name(dist_name, num_obvs, sample_no):
-    filename = 'sample-%02d.tab' % sample_no
-    path = ensure_dir(base_dir(dist_name, num_obvs) / 'samples') / filename
-    return path.absolute()
-
-
-def png_name(dist_name, num_obvs, sample_no, what):
-    filename = '%s-%02d.png' % (what, sample_no)
-    path = ensure_dir(base_dir(dist_name, num_obvs) / 'plots') / filename
-    return path.absolute()
-
 
 def read_data(fname):
     with open(fname, 'rt') as fh:
@@ -247,44 +216,48 @@ def plot_kde(dist_code, num_obvs, sample_no):
 @click.option('--k', type=int)
 @click.option('--j0', type=int, default=0)
 @click.option('--delta-j', type=int)
-@click.option('--kind', default='full')
-@click.option('--loss')
-@click.option('--ordering')
+@click.option('--kind', default='full', type=click.Choice(['all', 'cv1', 'cvx']))
+@click.option('--loss', type=click.Choice(WaveletDensityEstimator.LOSSES))
+@click.option('--ordering', type=click.Choice(WaveletDensityEstimator.ORDERINGS))
 def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     """
     Calculates WDE for given k, j0 and delta-j for all possible options
     """
-    def gen():
-        for ix, k, j0, delta_j in itt.product(sample_range, k_range, j0_range, delta_j_range):
-            source = sample_name(dist_code, num_obvs, ix+1)
-            data = read_data(source)
-            assert data.shape[0] == num_obvs
-            t0 = datetime.now()
-            wde = WaveletDensityEstimator(((wave_name, 0),(wave_name, 0)) , k=k, delta_j=delta_j)
-            wde.fit(data)
-            elapsed = (datetime.now() - t0).total_seconds()
-            hd, corr_factor = hellinger_distance(dist, wde)
-            params = wde.pdf.nparams
-            yield result_wde_classic(dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, hd, elapsed)
-            for loss, ordering in WaveletDensityEstimator.valid_options():
-                t0 = datetime.now()
-                wde.cvfit(data, loss, ordering)
-                elapsed = (datetime.now() - t0).total_seconds()
-                hd, corr_factor = hellinger_distance(dist, wde)
-                params = wde.pdf.nparams
-                yield result_wde_cv(dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, hd, elapsed)
     dist = dist_from_code(dist_code)
     kind = kwargs['kind']
-    if kind == 'full':
-        what = 'wde'
-    else:
-        raise NotImplemented()
+    loss = ordering = is_single = None
+    if kind == 'all':
+        what = 'wde_all'
+        if 'loss' in kwargs and kwargs['loss']:
+            raise ValueError('loss only for cv kind')
+        if 'ordering' in kwargs and kwargs['ordering']:
+            raise ValueError('loss only for cv kind')
+    elif kind == 'cv1':
+        what = 'wde_cv1'
+        loss = kwargs['loss']
+        ordering = kwargs['ordering']
+        is_single = True
+        if not loss:
+            raise click.BadOptionUsage('loss', 'For cv1, must specify loss')
+        if not ordering:
+            raise click.BadOptionUsage('ordering', 'For cv1, must specify ordering')
+    elif kind == 'cvx':
+        what = 'wde_cvx'
+        loss = kwargs['loss']
+        ordering = kwargs['ordering']
+        is_single = False
+        if not loss:
+            raise click.BadOptionUsage('loss', 'For cv1, must specify loss')
+        if not ordering:
+            raise click.BadOptionUsage('ordering', 'For cv1, must specify ordering')
     k = kwargs['k']
     what = what + ('.k_%d' % k)
     j0 = kwargs['j0']
     what = what + ('.j0_%d' % j0)
     delta_j = kwargs['delta_j']
     what = what + ('.delta_j_%d' % delta_j)
+    if kind[:2] == 'cv':
+        what += '.%s_%s_%s' % (kind, loss, ordering)
     what = wave_name + '-' + what
     png_file = png_name(dist_code, num_obvs, sample_no, what)
     source = sample_name(dist_code, num_obvs, sample_no)
@@ -292,8 +265,9 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     assert data.shape[0] == num_obvs
     wde = WaveletDensityEstimator(((wave_name, 0), (wave_name, 0)), k=k, delta_j=delta_j)
     wde.fit(data)
+    if kind != 'all':
+        wde.cvfit(data, loss, ordering, is_single)
     do_plot_wde(wde, png_file, dist)
-
 
 
 @main.command()

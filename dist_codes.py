@@ -62,11 +62,14 @@ class PyramidDist(object):
         pp += [(centre[0], centre[1], self.height)]
         pp = np.array(pp)
         self.fun = LinearNDInterpolator(pp[:,0:2], pp[:,2], fill_value=0.0)
+        minp = pp[:,[0,1]].min(axis=0)
+        maxp = pp[:,[0,1]].max(axis=0)
+        self.gen = lambda : np.random.rand(2) * (maxp - minp) + minp
 
     def rvs(self, num):
         data = []
         while num > 0:
-            pp = (random.random(), random.random())
+            pp = self.gen()
             u = random.random()
             if u <= max(0,self.fun(*pp)) / self.height:
                 data.append(pp)
@@ -274,7 +277,7 @@ class TruncatedLaplace2D(object):
 
 class MixtureDistribution(object):
     def __init__(self, probs, dists, code=None):
-        self.probs = probs
+        self.probs = np.array(probs) / sum(probs)
         self.dists = dists
         self.dim = dists[0].dim
         assert all([self.dim == dist.dim for dist in dists])
@@ -282,12 +285,9 @@ class MixtureDistribution(object):
             self.code = code
         else:
             self.code = 'x'.join([dist.code for dist in dists])
-        z = _pdf(self.probs, self.dists, mise_mesh(self.dim))
-        nns = reduce(lambda x, y: (x-1) * (y-1), z.shape)
-        self.sum = z.sum()/nns
 
     def pdf(self, grid):
-        return _pdf(self.probs, self.dists, grid)/self.sum
+        return _pdf(self.probs, self.dists, grid)
 
     def _rvs(self):
         while True:
@@ -475,6 +475,15 @@ def dist_from_code(code):
         return PyramidDist(((0.1,0.2),(0.4,0.9),(0.8,0.2)), (0.4,0.3))
     elif code == 'pyr2':
         return PyramidDist(((0.1, 0.2), (0.4, 0.9), (0.8, 0.2)), (0.4, 0.3))
+    elif code == 'pmx1':
+        dist0 = PyramidDist(((0.1,0.1),(0.4,0.9),(0.8,0.2)), (0.4,0.3))
+        dist1 = PyramidDist(((0.2,0.2),(0.3,0.3),(0.5,0.25)), (0.3,0.25))
+        dist2 = PyramidDist(((0.3,0.4),(0.4,0.5),(0.5,0.45)), (0.4,0.45))
+        dist3 =  PyramidDist(((0.35,0.55),(0.4,0.75),(0.5,0.5)), (0.4,0.65))
+        return MixtureDistribution(
+            [0.9, 0.03, 0.02, 0.05],
+            [dist0, dist1, dist2, dist3],
+            code)
     elif code == 'unif':
         return UniformDistribution()
     else:
