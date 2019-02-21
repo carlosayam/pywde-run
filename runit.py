@@ -292,9 +292,9 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 #
 
 if __name__ == "__main__":
+    click.echo("RUNNING python " + " ".join(sys.argv), err=True)
     def wtime(t0):
         secs = (datetime.now() - t0)
-        click.echo("[walltime %s] python " % str(secs), err=True, nl=False)
-        click.echo(" ".join(sys.argv), err=True)
+        click.echo("[walltime %s]" % str(secs), err=True)
     atexit.register(wtime, datetime.now())
     main()
