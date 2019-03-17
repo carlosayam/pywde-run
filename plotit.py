@@ -39,7 +39,7 @@ def calc_maxv(dist):
     return (zz / zz_sum).max()
 
 def plot_dist(fname, dist):
-    grid_n = 70
+    grid_n = 100
     xx, yy = grid_as_vector(grid_n)
     zz = dist.pdf((xx, yy))
     print('sum=', zz.mean())
