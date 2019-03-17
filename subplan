@@ -7,4 +7,4 @@ mkdir -p $HOME/RESP/job.output
 cd $HOME/RESP/job.output
 
 echo plan.bs $_RET
-qsub -l walltime=$WTIME -N JOB -v _RET plan.pbs
+qsub -l walltime=$WTIME -N JOB -v _RET $HOME/WDE/pywde-run/plan.pbs
