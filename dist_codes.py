@@ -476,13 +476,16 @@ def dist_from_code(code):
     elif code == 'pyr2':
         return PyramidDist(((0.1, 0.2), (0.4, 0.9), (0.8, 0.2)), (0.4, 0.3))
     elif code == 'pmx1':
-        dist0 = PyramidDist(((0.1,0.1),(0.4,0.9),(0.8,0.2)), (0.4,0.3))
+        ws = np.array([7, 7, 1, 1])
+        ws = ws / sum(ws)
+        dist0a = PyramidDist(((0.1,0.1),(0.4,0.9),(0.9,0.2)), (0.4,0.3))
+        dist0b = PyramidDist(((0.1,0.9),(0.4,0.1),(0.9,0.9)), (0.4,0.3))
         dist1 = PyramidDist(((0.2,0.2),(0.3,0.3),(0.5,0.25)), (0.3,0.25))
         dist2 = PyramidDist(((0.3,0.4),(0.4,0.5),(0.5,0.45)), (0.4,0.45))
         dist3 =  PyramidDist(((0.35,0.55),(0.4,0.75),(0.5,0.5)), (0.4,0.65))
         return MixtureDistribution(
-            [0.9, 0.03, 0.02, 0.05],
-            [dist0, dist1, dist2, dist3],
+            ws,
+            [dist0a, dist0b, dist1, dist2],
             code)
     elif code == 'unif':
         return UniformDistribution()
