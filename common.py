@@ -8,7 +8,7 @@ NUM_SAMPLES = 100
 def fname(what, dist_name, num=None, wave_name=None, delta_j=None, ext='.png'):
     strn = '%04d' % num if num is not None else None
     strd = '%d' % delta_j if delta_j is not None else None
-    strs = [dist_name, what, strn, wave_name, strd]
+    strs = [what, dist_name, strn, wave_name, strd]
     strs = [v for v in strs if v]
     return '%s/%s%s' % (ROOT_DIR, '-'.join(strs), ext)
 
