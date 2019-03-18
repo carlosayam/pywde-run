@@ -223,6 +223,7 @@ def calc_kde(dist_code, num_obvs, sample_no):
 @click.option('--k', type=int)
 @click.option('--j0', type=int)
 @click.option('--delta-j', type=int)
+@click.option('--multi', is_flag=True)
 def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     """
     Calculates WDE for given k, j0 and delta-j for all possible options
@@ -239,7 +240,7 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
             hd, corr_factor = hellinger_distance(dist, wde)
             params = wde.pdf.nparams
             yield result_wde_classic(dist_code, num_obvs, ix, wave_name, k, delta_j, params, hd, elapsed)
-            for loss, ordering, is_single in WaveletDensityEstimator.valid_options():
+            for loss, ordering, is_single in WaveletDensityEstimator.valid_options(single):
                 t0 = datetime.now()
                 wde.cvfit(data, loss, ordering, is_single=is_single)
                 elapsed = (datetime.now() - t0).total_seconds()
@@ -247,10 +248,10 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
                 params = wde.pdf.nparams
                 yield result_wde_cv(dist_code, num_obvs, ix, wave_name, k, delta_j, params, loss, ordering, is_single, hd, elapsed)
 
-
-
     dist = dist_from_code(dist_code)
-    what = 'wde'
+    what = wave_name
+    single = not kwargs['multi']
+    what = what + ('.single_%s' % single)
     if 'k' not in kwargs:
         k_range = [1, 2]
     else:
@@ -269,7 +270,7 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         delta_j = kwargs['delta_j']
         delta_j_range = [delta_j]
         what = what + ('.delta_j_%d' % delta_j)
-    what = wave_name + '-' + what
+    what = 'wde-' + what
     if sample_no == 0:
         sample_range = range(1, NUM_SAMPLES + 1)
         result_file = results_name(dist_code, num_obvs, 0, what)
