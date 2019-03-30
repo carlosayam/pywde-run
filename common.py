@@ -30,7 +30,11 @@ def sample_name(dist_name, num_obvs, sample_no):
 
 
 def results_name(dist_name, num_obvs, sample_no, what):
-    filename = '%s-%03d.tab' % (what, sample_no)
+    if type(sample_no) == int:
+        filename = '%s-%03d.tab' % (what, sample_no)
+    else: # type(sample_no) == tuple
+        min_n, max_n = sample_no
+        filename = '%s-%03d_%03d.tab' % (what, min_n, max_n)
     path = ensure_dir(base_dir(dist_name, num_obvs) / 'results') / filename
     return path.absolute()
 

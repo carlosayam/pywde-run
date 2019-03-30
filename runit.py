@@ -205,36 +205,38 @@ def calc_kde(dist_code, num_obvs, sample_no):
     dist = dist_from_code(dist_code)
     if sample_no == 0:
         sample_range = range(1, NUM_SAMPLES + 1)
-        result_file = results_name(dist_code, num_obvs, 0, 'kde')
+        result_file = results_name(dist_code, num_obvs, (1, NUM_SAMPLES), 'kde')
     else:
         sample_range = [sample_no]
         result_file = results_name(dist_code, num_obvs, sample_no, 'kde')
     with open(result_file, 'wt') as fh:
         writer = csv.writer(fh, delimiter='\t')
         for result in gen():
+            if len(sample_range) == 1:
+                print(result)
             writer.writerow(list(result))
 
 
 @main.command()
 @click.argument('dist_code')
 @click.argument('num_obvs', type=int)
-@click.argument('sample_no', type=int, default='0')
+@click.argument('sample_no', default='')
 @click.argument('wave_name')
-@click.option('--k', type=int)
-@click.option('--j0', type=int)
-@click.option('--delta-j', type=int)
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--delta-j', type=int, default=0)
 @click.option('--multi', is_flag=True)
 def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     """
     Calculates WDE for given k, j0 and delta-j for all possible options
     """
     def gen():
-        for ix, k, j0, delta_j in itt.product(sample_range, k_range, j0_range, delta_j_range):
+        for ix, k, delta_j in itt.product(sample_range, k_range, delta_j_range):
             source = sample_name(dist_code, num_obvs, ix)
             data = read_data(source)
             assert data.shape[0] == num_obvs
             t0 = datetime.now()
-            wde = WaveletDensityEstimator(((wave_name, 0),(wave_name, 0)) , k=k, delta_j=delta_j)
+            wde = WaveletDensityEstimator(((wave_name, j0),(wave_name, j0)) , k=k, delta_j=delta_j)
             wde.fit(data)
             elapsed = (datetime.now() - t0).total_seconds()
             hd, corr_factor = hellinger_distance(dist, wde)
@@ -259,11 +261,10 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         k_range = [k]
         what = what + ('.k_%d' % k)
     if 'j0' not in kwargs:
-        j0_range = [0]
+        j0 = 0
     else:
         j0 = kwargs['j0']
-        j0_range = [j0]
-        what = what + ('.j0_%d' % j0)
+    what = what + ('.j0_%d' % j0)
     if 'delta_j' not in kwargs:
         delta_j_range = range(0, 6)
     else:
@@ -271,9 +272,13 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         delta_j_range = [delta_j]
         what = what + ('.delta_j_%d' % delta_j)
     what = 'wde-' + what
-    if sample_no == 0:
+    if sample_no == '':
         sample_range = range(1, NUM_SAMPLES + 1)
-        result_file = results_name(dist_code, num_obvs, 0, what)
+        result_file = results_name(dist_code, num_obvs, (1,NUM_SAMPLES), what)
+    elif ':' in sample_no:
+        min_n, max_n = map(int, sample_no.split(':',2))
+        sample_range = range(min_n, max_n + 1)
+        result_file = results_name(dist_code, num_obvs, (min_n, max_n), what)
     else:
         sample_range = [sample_no]
         result_file = results_name(dist_code, num_obvs, sample_no, what)
@@ -281,6 +286,47 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         writer = csv.writer(fh, delimiter='\t')
         for result in gen():
             writer.writerow(list(result))
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int, default='0')
+@click.argument('wave_name')
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--delta-j', type=int, default=0)
+@click.option('--loss', type=click.Choice(WaveletDensityEstimator.LOSSES), default=None)
+@click.option('--ordering', type=click.Choice(WaveletDensityEstimator.ORDERINGS.keys()), default=None)
+@click.option('--multi', is_flag=True)
+def calc_wde_cv(dist_code, num_obvs, sample_no, wave_name, **kwargs):
+    """
+    Calculates WDE CV for given params
+    """
+    dist = dist_from_code(dist_code)
+    #what = wave_name
+    single = not kwargs['multi']
+    #what = what + ('.single_%s' % single)
+    k = kwargs['k']
+    #what = what + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    #what = what + ('.j0_%d' % j0)
+    delta_j = kwargs['delta_j']
+    #what = what + ('.delta_j_%d' % delta_j)
+    #what = 'wde-' + what
+    loss = kwargs['loss']
+    ordering = kwargs['ordering']
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    t0 = datetime.now()
+    wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k, delta_j=delta_j)
+    wde.fit(data)
+    wde.cvfit(data, loss, ordering, is_single=single)
+    elapsed = (datetime.now() - t0).total_seconds()
+    hd, corr_factor = hellinger_distance(dist, wde)
+    params = wde.pdf.nparams
+    print('RESULT', dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, single, hd, elapsed)
 
 
 #
