@@ -1,10 +1,37 @@
-#!/bin/bash
-WTIME=$1
-shift
-_RET=$(getopt --shell sh --options "" -- -- "$@") && export _RET=${_RET# --}
+#!/usr/bin/python
 
-mkdir -p $HOME/RESP/job.output
-cd $HOME/RESP/job.output
+from __future__ import print_function
+import subprocess
+import os
+import sys
 
-echo plan.bs $_RET
-qsub -l walltime=$WTIME -N JOB -v _RET $HOME/WDE/pywde-run/plan.pbs
+QSUB = '/opt/torque/bin/qsub'
+RESP = 'RESP'
+
+def popen_args(env):
+    jname = sys.argv[0]
+    wtime = sys.argv[1]
+    opts = ' '.join(["'%s'" % v for v in sys.argv[2:]])
+    env = os.environ.copy()
+    env['_RET'] = opts
+    args = [QSUB,
+            '-N', jname,
+            '-l', 'walltime=%s' % wtime,
+            '-v', '_RET',
+            '%s/WDE/pywde-run/plan.pbs' % env['HOME']
+            ]
+    cwd = '%s/%s/job.output' % (env['HOME'], RESP)
+    if not os.path.exists(cwd):
+        os.makedirs(cwd)
+    return args, env, cwd
+
+
+def main():
+    args, env, cwd = popen_args(os.environ.copy())
+    print('submitting: plan.pbs', env['_RET'])
+    ret = subprocess.call(args, env=env, cwd=cwd)
+    exit(ret)
+
+
+if __name__ == '__main__':
+    main()
