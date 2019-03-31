@@ -17,7 +17,7 @@ RESP_DIR="$PBS_O_HOME/RESP"
 SW_DIR="$PBS_O_HOME/WDE/pywde-run"
 
 mkdir -p $RESP_DIR/
-cd $RESP_DIR
+cd $RESP_DIR/..
 
 . $SW_DIR/.venv/bin/activate
 export PYTHONPATH=$SW_DIR
