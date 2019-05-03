@@ -49,6 +49,46 @@ def _pdf(probs, dists, grid):
     return pdf_vals
 
 
+class TempleDist(object):
+    def __init__(self, points, centre, code='tem1'):
+        self.code = code
+        self.dim = 2
+        x0, y0 = points[0]
+        x1, y1 = points[1]
+        assert x0 <= centre[0] <= x1
+        assert y0 <= centre[1] <= y1
+        self.height = 3 / (x1 - x0) / (y1 - y0)
+        pp = [(x, y, 0) for x,y in [(x0,y0), (x0,y1), (x1,y1), (x1,y0)]]
+        pp += [(centre[0], centre[1], self.height)]
+        pp = np.array(pp)
+        self.fun = LinearNDInterpolator(pp[:,0:2], pp[:,2], fill_value=0.0)
+        minp = np.array([x0, y0])
+        maxp = np.array([x1, y1])
+        self.gen = lambda : np.random.rand(2) * (maxp - minp) + minp
+
+    def rvs(self, num):
+        data = []
+        while num > 0:
+            pp = self.gen()
+            u = random.random()
+            if u <= max(0,self.fun(*pp)) / self.height:
+                data.append(pp)
+                num -= 1
+                if num == 0:
+                    break
+        return np.array(data)
+
+    def pdf(self, grid):
+        if type(grid) == tuple or type(grid) == list:
+            X, Y = grid
+            grid = np.array((X.flatten(), Y.flatten())).T
+            vals = np.clip(self.fun(grid),0,None)
+            vals = vals.reshape(X.shape[0], Y.shape[0])
+            return vals
+        else:
+            return np.clip(self.fun(grid),0,None)
+
+
 class PyramidDist(object):
     def __init__(self, points, centre, code='pyr1'):
         if not in_triangle(centre, points):
@@ -498,5 +538,51 @@ def dist_from_code(code):
             code)
     elif code == 'unif':
         return UniformDistribution()
+    elif code == 'tem1':
+        return TempleDist([(0.1,0.1), (0.7,0.6)], (0.5, 0.4), 'tem1')
+    elif code == 'tem2':
+        return TempleDist([(0.25, 0.25), (0.75, 0.75)], (0.5, 0.5), 'tem2')
+    elif code == 'tmx1':
+        ws = np.array([7, 7, 1, 2])
+        ws = ws / sum(ws)
+        dist0a = TempleDist([(0.1,0.1), (0.7,0.8)], (0.5, 0.4), '')
+        dist0b = TempleDist([(0.2,0.3), (0.9,0.9)], (0.4, 0.5), '')
+        dist1 = TempleDist([(0.3,0.175), (0.7,0.225)], (0.35, 0.20), '')
+        dist2 = TempleDist([(0.7,0.4), (0.8,0.8)], (0.75, 0.5), '')
+        return MixtureDistribution(
+            ws,
+            [dist0a, dist0b, dist1, dist2],
+            code)
+    elif code == 'tmx2':
+        ws = np.array([2, 2, 1, 1])
+        ws = ws / sum(ws)
+        dist0a = TempleDist([(0.1, 0.1), (0.7, 0.8)], (0.5, 0.4), '')
+        dist0b = TempleDist([(0.2, 0.3), (0.9, 0.9)], (0.4, 0.5), '')
+        dist1 = TempleDist([(0.3, 0.2), (0.7, 0.4)], (0.35, 0.25), '')
+        dist2 = TempleDist([(0.6, 0.4), (0.8, 0.8)], (0.75, 0.5), '')
+        return MixtureDistribution(
+            ws,
+            [dist0a, dist0b, dist1, dist2],
+            code)
+    elif code == 'tmx3':
+        ws = np.array([1, 1, 3])
+        ws = ws / sum(ws)
+        dist1 = TempleDist([(0.125, 0.25), (0.25, 0.75)], (0.1875, 0.5), '')
+        dist2 = TempleDist([(0.25, 0.125), (0.75, 0.25)], (0.5, 0.1875), '')
+        dist3 = TempleDist([(0.125, 0.125), (0.75, 0.75)], (0.5, 0.5), '')
+        return MixtureDistribution(
+            ws,
+            [dist1, dist2, dist3],
+            code)
+    elif code == 'tmx4':
+        ws = np.array([1, 1])
+        ws = ws / sum(ws)
+        dist1 = TempleDist([(0.125, 0.625), (0.75, 0.75)], (0.25, 0.6875), '')
+        dist2 = TempleDist([(0.5, 0.125), (0.625, 0.875)], (0.5625, 0.25), '')
+        return MixtureDistribution(
+            ws,
+            [dist1, dist2],
+            code)
+
     else:
         raise NotImplemented('Unknown distribution code [%s]' % code)

@@ -4,14 +4,26 @@ from __future__ import print_function
 import subprocess
 import os
 import sys
+from datetime import timedelta
 
 QSUB = '/opt/torque/bin/qsub'
 RESP = 'RESP'
 
+
+def gen_samples_walltime(dist_code, num_obvs):
+    return timedelta(seconds=num_obvs * 90.0 / 1000 + 30.0)
+
+def estimate_walltime(command, args):
+    if command == 'gen-samples':
+        dist_code = args[0]
+        num_obvs = int(args[1])
+        return gen_samples_walltime(dist_code, num_obvs)
+
 def popen_args(env):
     jname = sys.argv[0]
-    wtime = sys.argv[1]
-    opts = ' '.join(["'%s'" % v for v in sys.argv[2:]])
+    meth_call = sys.argv[1]
+    wtime = str(estimate_walltime(meth_call, sys.argv[2:]))
+    opts = ' '.join(["'%s'" % v for v in sys.argv[1:]])
     env = os.environ.copy()
     env['_RET'] = opts
     args = [QSUB,

@@ -299,6 +299,7 @@ def calc_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 @click.option('--loss', type=click.Choice(WaveletDensityEstimator.LOSSES), default=None)
 @click.option('--ordering', type=click.Choice(WaveletDensityEstimator.ORDERINGS.keys()), default=None)
 @click.option('--multi', is_flag=True)
+@click.option('--plot', type=click.Choice(['save', 'view']), default=None)
 def calc_wde_cv(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     """
     Calculates WDE CV for given params
@@ -316,6 +317,8 @@ def calc_wde_cv(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     #what = 'wde-' + what
     loss = kwargs['loss']
     ordering = kwargs['ordering']
+    plot = kwargs['plot']
+
     source = sample_name(dist_code, num_obvs, sample_no)
     data = read_data(source)
     assert data.shape[0] == num_obvs
@@ -323,10 +326,56 @@ def calc_wde_cv(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k, delta_j=delta_j)
     wde.fit(data)
     wde.cvfit(data, loss, ordering, is_single=single)
-    elapsed = (datetime.now() - t0).total_seconds()
-    hd, corr_factor = hellinger_distance(dist, wde)
-    params = wde.pdf.nparams
-    print('RESULT', dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, single, hd, elapsed)
+    if plot:
+        import plotlib
+        fname = 'test.png'
+        plotlib.do_plot_wde(wde, fname, dist, plot)
+    else:
+        elapsed = (datetime.now() - t0).total_seconds()
+        hd, corr_factor = hellinger_distance(dist, wde)
+        params = wde.pdf.nparams
+        print('RESULT', dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, loss, ordering, single, hd, elapsed)
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int, default='0')
+@click.argument('wave_name')
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--delta-j', type=int, default=0)
+@click.option('--plot', type=click.Choice(['save', 'view']), default=None)
+def calc_wde1(dist_code, num_obvs, sample_no, wave_name, **kwargs):
+    """
+    Calculates WDE CV for given params
+    """
+    dist = dist_from_code(dist_code)
+    #what = what + ('.single_%s' % single)
+    k = kwargs['k']
+    #what = what + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    #what = what + ('.j0_%d' % j0)
+    delta_j = kwargs['delta_j']
+    # plot
+    plot = kwargs['plot']
+
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    t0 = datetime.now()
+    wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k, delta_j=delta_j)
+    wde.fit(data)
+    if plot:
+        import plotlib
+        fname = 'test.png'
+        plotlib.do_plot_wde(wde, fname, dist, plot)
+    else:
+        elapsed = (datetime.now() - t0).total_seconds()
+        hd, corr_factor = hellinger_distance(dist, wde)
+        params = wde.pdf.nparams
+        print('RESULT', dist_code, num_obvs, sample_no, wave_name, k, delta_j, params, None, None, None, hd, elapsed)
+
 
 
 #
