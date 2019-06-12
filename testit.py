@@ -37,6 +37,20 @@ def calculate_nearest_balls_1d(data, xs, k):
     return xs_balls * sqrt_vunit
 
 
+def calculate_nearest_plus_one(data, xs, k):
+    "Calculate and store (k+1)-th nearest balls"
+    dim = 1
+    data = np.atleast_2d(data).T
+    ball_tree = BallTree(data)
+    dist, inx = ball_tree.query(np.atleast_2d(xs).T, k + 2)
+    k_near_radious = dist[:, -2]
+    k_plus_one = dist[:,-1]
+    k_balls = np.power(k_near_radious, dim / 2.0)
+    k_p1_balls = np.power(k_plus_one, dim/2.0)
+    sqrt_vunit = (np.pi ** (dim / 4.0)) / (gamma(dim / 2.0 + 1) ** 0.5)
+    return inx, k_balls * sqrt_vunit, k_p1_balls * sqrt_vunit
+
+
 @click.group()
 def main():
     pass
@@ -74,7 +88,8 @@ def esr(dist_code):
 @click.option('--k', type=int)
 def hist_cv(num_obs, **kwargs):
     """
-    Demo picking histograms bin width (1D) using CV and ESRD
+    Demo picking histograms bin width (1D) using CV and ESR
+    -> CORRECT.
     """
     ## dist = dist_from_code(dist_code)
     pp = []
@@ -125,6 +140,7 @@ def hist_cv(num_obs, **kwargs):
 def hist_cv2(num_obs, **kwargs):
     """
     Demo picking histograms bin width (1D) using CV and ESRD
+    -> WRONG
     """
     ## dist = dist_from_code(dist_code)
     pp = []
@@ -136,7 +152,7 @@ def hist_cv2(num_obs, **kwargs):
     x0, x1 = data.min(), data.max() + 0.0001
     pp = []
     print('trials each', int(math.log(num_obs)))
-    b1 = calculate_nearest_balls_1d(data, data, k)
+    # b1 = calculate_nearest_balls_1d(data, data, k)
     for nbins in range(2, int(num_obs/4)):
         ss = []
         idx0 = list(set(np.random.randint(0, num_obs, size=20)))
@@ -160,6 +176,56 @@ def hist_cv2(num_obs, **kwargs):
     sigma = 1 + int(math.log(num_obs))
     smo = gaussian_filter1d(pp[:,1], sigma=sigma, mode='nearest')
     nbins = int(pp[np.argmax(smo),0]/0.9)
+    print('best bins # >>', nbins, '(sigma = %d)' % sigma)
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(pp[:,0], pp[:,1], 'k.', markersize=1)
+    plt.plot(pp[:,0], smo, 'r-')
+    plt.show()
+    plt.close()
+    plt.figure()
+    plt.hist(data, bins=nbins)
+    plt.show()
+
+
+@main.command()
+@click.argument('num_obs', type=int)
+@click.option('--k', type=int)
+def hist_cv3(num_obs, **kwargs):
+    """
+    Demo picking histograms bin width (1D) using CV and ESRD
+    if i' = nn(i) => remove i', nn(i) = i'' =>  Sum H^{-i'}(X_i) Sqrt{NN_i} for i such nn(i)=i' ??
+    """
+    ## dist = dist_from_code(dist_code)
+    pp = []
+    k = kwargs['k'] if 'k' in kwargs and kwargs['k'] is not None else 1
+    omega = gamma(k) / gamma(k + 0.5)
+    data = np.hstack((np.random.normal(0.5, 0.5, size=int(num_obs/2)),
+                      np.random.normal(3, 1, size=int(num_obs / 2))))
+    print('shape=', data.shape)
+    pp = []
+    print('trials each', int(math.log(num_obs)))
+    inx, k_balls, k_p1_balls = calculate_nearest_plus_one(data, data, k)
+    # import code
+    # code.interact('**', local=locals())
+    for nbins in range(2, int(num_obs/4)):
+        tot = 0.0
+        print(nbins)
+        for nni in set(inx[:,-2]):
+            data1 = np.delete(data, [nni])
+            x0, x1 = data1.min(), data1.max() + 0.0001
+            hist, bin_edges = np.histogram(data1, bins=nbins, range=(x0, x1), density=True)
+            sqrt_h = lambda x: math.sqrt(hist[int(nbins * (x - x0)/(x1 - x0))])
+            xs = data[inx[inx[:,-2] == nni,0]]
+            bs = k_p1_balls[inx[:,-2] == nni]
+            ys = np.array([sqrt_h(x) for x in xs])
+            tot += omega * (ys * bs).sum()
+        pp.append((nbins, tot))
+        ## print(nbins, ',', val)
+    pp = np.array(pp)
+    sigma = 1 + int(math.log(num_obs))
+    smo = gaussian_filter1d(pp[:,1], sigma=sigma, mode='nearest')
+    nbins = int(pp[np.argmax(smo),0])
     print('best bins # >>', nbins, '(sigma = %d)' % sigma)
     import matplotlib.pyplot as plt
     plt.figure()
