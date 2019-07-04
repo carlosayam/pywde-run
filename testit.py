@@ -149,43 +149,39 @@ def hist_cv2(num_obs, **kwargs):
     data = np.hstack((np.random.normal(0.5, 0.5, size=int(num_obs/2)),
                       np.random.normal(3, 1, size=int(num_obs / 2))))
     print('shape=', data.shape)
-    x0, x1 = data.min(), data.max() + 0.0001
     pp = []
-    print('trials each', int(math.log(num_obs)))
-    # b1 = calculate_nearest_balls_1d(data, data, k)
-    for nbins in range(2, int(num_obs/4)):
-        ss = []
-        idx0 = list(set(np.random.randint(0, num_obs, size=20)))
-        idx1 = [ix for ix in range(num_obs) if ix not in idx0]
-        data0 = np.delete(data, idx1)
-        b1 = calculate_nearest_balls_1d(data, data0, k)
-        ys = []
-        for ix in idx0:
-            data1 = np.delete(data, [ix])
+    x0, x1 = data.min(), data.max() + 0.0001
+    inx, k_balls, k_p1_balls = calculate_nearest_plus_one(data, data, k)
+    corr_f = math.sqrt((k_balls * k_balls).sum())
+    for nbins in range(2, 4 * int(math.log(num_obs)) ** 2, 7): # range(2, int(num_obs/4), int(num_obs/300)):
+        tot = 0.0
+        print(nbins)
+        for i in range(num_obs):
+            data1 = np.delete(data, [i])
             hist, bin_edges = np.histogram(data1, bins=nbins, range=(x0, x1), density=True)
             sqrt_h = lambda x: math.sqrt(hist[int(nbins * (x - x0)/(x1 - x0))])
-            ys.append(sqrt_h(data[ix]))
-        ys = np.array(ys)
-        val = omega * (ys * b1).sum() / math.sqrt(len(idx0))
-        ss.append(val)
-        val = np.array(ss)
-        px0, pxd = val.mean(), val.std()
-        pp.append((nbins, px0, px0 - pxd, px0 + pxd))
+            tot += sqrt_h(data[i]) * k_balls[i]
+        tot = omega * tot / math.sqrt(num_obs) / corr_f
+        pp.append((nbins, tot))
         ## print(nbins, ',', val)
     pp = np.array(pp)
-    sigma = 1 + int(math.log(num_obs))
+    sigma = 0.8
     smo = gaussian_filter1d(pp[:,1], sigma=sigma, mode='nearest')
-    nbins = int(pp[np.argmax(smo),0]/0.9)
-    print('best bins # >>', nbins, '(sigma = %d)' % sigma)
+    print('>>', 2 * (k_balls * k_balls).sum() / math.sqrt(num_obs))
+    ff = math.sqrt(2 * (k_balls * k_balls).sum() / math.sqrt(num_obs))
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(pp[:,0], pp[:,1], 'k.', markersize=1)
-    plt.plot(pp[:,0], smo, 'r-')
+    plt.plot(pp[:,0], pp[:,1] / ff, 'k.', markersize=1)
+    plt.plot(pp[:,0], smo / ff, 'r-')
     plt.show()
     plt.close()
-    plt.figure()
-    plt.hist(data, bins=nbins)
-    plt.show()
+    for ff in [1.0,]:
+        # print('best bins # >>', nbins, '(sigma = %d)' % sigma)
+        nbins = int(ff * pp[np.argmax(smo),0])
+        plt.figure()
+        plt.hist(data, bins=nbins)
+        plt.title('N=%d (f %f)' % (nbins, ff))
+        plt.show()
 
 
 @main.command()
@@ -220,10 +216,10 @@ def hist_cv3(num_obs, **kwargs):
             bs = k_p1_balls[inx[:,-2] == nni]
             ys = np.array([sqrt_h(x) for x in xs])
             tot += omega * (ys * bs).sum()
-        pp.append((nbins, tot))
+        pp.append((nbins, tot / math.sqrt(num_obs)))
         ## print(nbins, ',', val)
     pp = np.array(pp)
-    sigma = 1 + int(math.log(num_obs))
+    sigma = 1 + int(math.log(num_obs)/2)
     smo = gaussian_filter1d(pp[:,1], sigma=sigma, mode='nearest')
     nbins = int(pp[np.argmax(smo),0])
     print('best bins # >>', nbins, '(sigma = %d)' % sigma)
@@ -236,6 +232,58 @@ def hist_cv3(num_obs, **kwargs):
     plt.figure()
     plt.hist(data, bins=nbins)
     plt.show()
+
+
+@main.command()
+@click.argument('code')
+def nu(code):
+    """Demo of nu correction and Hellinger distance using 1-NN"""
+    # Note: this `correction` would be a factor in BC calculations and therefore, if using a maximum,
+    # not relevant. If using HD, then it is better if one normalises the whole HD to be 0 at bottom;
+    # i.e HD^2 = 1 - BC(p) / max(BC(p) p \in P) [P : parameter space]
+    codes = dict(
+        mix1=lambda num_obs: np.hstack((
+            np.random.normal(0.5, 0.5, size=num_obs // 2),
+            np.random.normal(3, 1, size=num_obs // 2)
+        )),
+        mix2=lambda num_obs: np.hstack((
+            np.random.normal(0.5, 0.5, size=num_obs // 4),
+            np.random.normal(3, 1, size=num_obs // 2),
+            np.random.normal(4, 1, size=num_obs // 4),
+        )),
+        unif=lambda num_obs: np.random.uniform(0, 1, size=num_obs),
+        uni4=lambda num_obs: np.random.uniform(0, 4, size=num_obs),
+        norm=lambda num_obs: np.random.normal(0, 1, size=num_obs),
+        nor4=lambda num_obs: np.random.normal(0, 4, size=num_obs),
+    )
+
+    k = 1
+    omega = gamma(k) / gamma(k + 0.5)
+    pp = []
+    for num_obs in range(50,5000,10):
+        dist = codes[code]
+        data = dist(num_obs)
+        inx, k_balls, k_p1_balls = calculate_nearest_plus_one(data, data, k)
+        tot = (k_balls * k_balls).sum()
+        # ^^ tot above tends to a value that depends on the entropy (??) of the density ^^
+        pp.append((num_obs, tot))
+        if num_obs % 10 == 0:
+            print('.', end='')
+            sys.stdout.flush()
+    print()
+    pp = np.array(pp)
+    sigma = 1 + int(math.log(num_obs)*4)
+    smo = gaussian_filter1d(pp[:,1], sigma=sigma, mode='nearest')
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(pp[:,0], pp[:,1], 'k.', markersize=1)
+    plt.plot(pp[:,0], smo, 'r-')
+    plt.title(code)
+    plt.show()
+    plt.close()
+
+
+
 
 
 if __name__ == "__main__":

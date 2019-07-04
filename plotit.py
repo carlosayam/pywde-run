@@ -1,26 +1,19 @@
 import atexit
 import csv
 import itertools as itt
-import os
-import pathlib
 import sys
-from collections import namedtuple
 from datetime import datetime
 
 import click
 import numpy as np
-import scipy.integrate as integrate
-#from scipy.spatial import Delaunay
-from scipy.interpolate import LinearNDInterpolator
 
-import matplotlib.pyplot as plt
 from dist_codes import dist_from_code
 from common import *
-from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from pywde.square_root_estimator import WaveletDensityEstimator
+from pywde.spwde import SPWDE
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
-from plotlib import plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour, do_dist_contour, plot_energy
+from plotlib import plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour, do_dist_contour, plot_energy, plot_trace
 
 
 def read_data(fname):
@@ -126,9 +119,9 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
             raise click.BadOptionUsage('loss', 'For iter, must not specify ordering')
         if 'ordering' in kwargs and kwargs['ordering']:
             raise click.BadOptionUsage('ordering', 'For iter, must not specify ordering')
-        if 'delta_j' in kwargs and kwargs['delta_j'] and kwargs['delta_j'] > 0:
-            raise click.BadOptionUsage('delat_j', 'For iter, delta_j is calculated')
-        delta_j = 0
+        if 'delta_j' not in kwargs or kwargs['delta_j'] is None or kwargs['delta_j'] <= 0:
+            raise click.BadOptionUsage('delta_j', 'For iter, delta_j is specified')
+        delta_j = kwargs['delta_j']
     k = kwargs['k']
     what = what + ('.k_%d' % k)
     j0 = kwargs['j0']
@@ -148,12 +141,57 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
         wde.cvfit(data, loss, ordering, is_single)
     else: # kind == iter
         wde.iterfit(data)
+        # import code
+        # _env_ = locals().copy()
+        # _env_['plt'] = plt
+        # code.interact('** wde, plt', local=_env_)
     if hasattr(wde, 'threshold'):
         plot_energy(wde, str(png_file).replace('.png', '-energy.png'))
+    if hasattr(wde, 'trace_v'):
+        plot_trace(wde, str(png_file).replace('.png', '-trace.png'))
     if kwargs['contour']:
         do_wde_contour(wde, png_file, dist)
     else:
         do_plot_wde(wde, png_file, dist, 'view')
+
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.option('--k', type=int)
+@click.option('--j0', type=int, default=0)
+@click.option('--contour', is_flag=True)
+def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
+    """
+    Calculates WDE for given k, j0 and delta-j for all possible options
+    """
+    dist = dist_from_code(dist_code)
+    k = kwargs['k']
+    what = 'best_j' + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
+    png_file = png_name(dist_code, num_obvs, sample_no, what)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
+    # wde.best_j(data)
+    spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
+    spwde.best_j(data)
+    return
+    # if hasattr(wde, 'threshold'):
+    #     plot_energy(wde, str(png_file).replace('.png', '-energy.png'))
+    # if hasattr(wde, 'trace_v'):
+    #     plot_trace(wde, str(png_file).replace('.png', '-trace.png'))
+    # if kwargs['contour']:
+    #     do_wde_contour(wde, png_file, dist)
+    # else:
+    #     do_plot_wde(wde, png_file, dist, 'view')
+
 
 
 @main.command()

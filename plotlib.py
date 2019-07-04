@@ -1,25 +1,10 @@
-import atexit
-import csv
-import itertools as itt
-import os
-import pathlib
-import sys
-from collections import namedtuple
-from datetime import datetime
 import random
 
-import click
 import numpy as np
 import scipy.integrate as integrate
-#from scipy.spatial import Delaunay
-from scipy.interpolate import LinearNDInterpolator
 
 import matplotlib.pyplot as plt
-from dist_codes import dist_from_code
-from common import *
 from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
-from pywde.square_root_estimator import WaveletDensityEstimator
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 
 
@@ -38,6 +23,7 @@ def calc_maxv(dist):
     zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
     print('int =', zz_sum)
     return (zz / zz_sum).max()
+
 
 def plot_dist(fname, dist):
     grid_n = 100
@@ -162,6 +148,31 @@ def plot_energy(wde, fname):
     print('%s saved' % fname)
 
 
+def plot_trace(wde, fname):
+    plt.figure()
+    vals = wde.trace_v
+    # [:,0] - step, [:,1] - new_loss, [:,2] - loss, [:,3] - beta^2, [:,4] - j
+    xx = vals[:, 0]
+    yy = vals[:, 1]
+    maxj = vals[:,4].max()
+    for jj in range(int(maxj)+1):
+        xs = xx[vals[:,4] == jj]
+        ys = yy[vals[:,4] == jj]
+        plt.plot(xs, ys, '.', label='j=%d' % jj)
+    # plt.plot(xx, vals[:,2], 'r.')
+    # plt.plot(xx, vals[:,2] - vals[:,3], 'k.')
+    plt.xlabel('Step')
+    plt.ylabel('$HD_1$')
+    plt.legend()
+    lbl = random.randint(1,10000)
+    plt.title('Trace (%s)' % str(lbl))
+    print('Title >', lbl)
+    plt.show()
+    plt.savefig(fname)
+    plt.close()
+    print('%s saved' % fname)
+
+
 def do_plot_kde(kde, fname, dist, zlim):
     print('Plotting %s' % fname)
     hd, corr_factor = hellinger_distance(dist, kde)
@@ -200,7 +211,7 @@ def do_kde_contour(kde, fname, dist, zlim):
     max_z = zz.max()
     print('max_z', max_z)
     cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 12))
-    plt.title(('KDE bw=%s' % str(kde.bw)) + ('\nHD = %g' % hd))
+    plt.title(('KDE %d bw=%s' % (kde.nobs, str(kde.bw))) + ('\nHD = %g' % hd))
     plt.clabel(cs, inline=1, fontsize=10)
     #plt.scatter(data[:,0], data[:,1], s=2, alpha=0.0001)
     plt.show()
@@ -209,14 +220,8 @@ def do_kde_contour(kde, fname, dist, zlim):
     plt.clf()
     plt.close()
 
-    ##ax.set_title(('KDE bw=%s' % str(kde.bw)) + ('\nHD = %g' % hd))
-    ##ax.set_zlim(0, zlim)
-
-
 
 def hellinger_distance_wip(dist, dist_est):
-    # import code
-    # code.interact(local=locals())
     def ferr(x, y):
         args = np.array([(x, y)])
         pdf_vals = np.sqrt(dist.pdf(args))
@@ -243,7 +248,6 @@ def hellinger_distance(dist, dist_est):
         pred_vals = vals.reshape(X.shape[0], Y.shape[0])
     else:
         pred_vals = dist_est.pdf(grid)
-    #print('WDE:', pred_vals.mean())
     corr_factor = pred_vals.mean()
     print('corr factor = %g' % corr_factor)
     pred_vals = pred_vals / corr_factor

@@ -583,6 +583,5 @@ def dist_from_code(code):
             ws,
             [dist1, dist2],
             code)
-
     else:
         raise NotImplemented('Unknown distribution code [%s]' % code)
