@@ -181,7 +181,10 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
-    spwde.best_j(data)
+    spwde.best_j(data, mode=spwde.MODE_NORMED)
+    for data_for_j in spwde.best_j_data:
+        j, b_hat_j, pdf = data_for_j
+
     return
     # if hasattr(wde, 'threshold'):
     #     plot_energy(wde, str(png_file).replace('.png', '-energy.png'))

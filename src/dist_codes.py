@@ -446,14 +446,14 @@ def dist_from_code(code):
     elif code == 'mix6':
         theta = np.pi / 4
         rot = lambda angle : np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
-        m0 = np.array([[0.1, 0], [0, 0.0025]])
+        m0 = np.array([[0.06, 0], [0, 0.0025]])
         m1 = np.dot(rot(theta), np.dot(m0, rot(theta).T)) / 2
         m2 = np.dot(rot(-theta), np.dot(m0, rot(-theta).T)) / 2
         prop = np.array([1, 1])
         prop = prop / prop.sum()
         return TruncatedMultiNormalD(
             prop.tolist(),
-            [np.array([0.3, 0.3]), np.array([0.7, 0.3])], [m1, m2],
+            [np.array([0.3, 0.5]), np.array([0.7, 0.5])], [m1, m2],
             code=code
         )
     elif code == 'mix7': ## not good
@@ -471,6 +471,7 @@ def dist_from_code(code):
             code=code
         )
     elif code == 'mix8':
+        ## PAPER, USED ##
         sigma = 0.03
         angle = 10.
         theta = (angle / 180.) * np.pi
@@ -487,7 +488,7 @@ def dist_from_code(code):
             [m1, m2 / 1.5, m1 / 2, m2 / 3],
             code=code
         )
-    elif code == 'mix9':
+    elif code == 'mix10':
         sigma = 0.03
         angle = 10.
         theta = (angle / 180.) * np.pi
@@ -501,6 +502,23 @@ def dist_from_code(code):
             prop.tolist(),
             [np.array([0.2, 0.3]), np.array([0.5, 0.5]), np.array([0.65, 0.7]), np.array([0.82, 0.85])],
             [m1, np.array([[0.05,0],[0,0.05]]), m2 / 4.5, m1 / 5],
+            code=code
+        )
+    elif code == 'mix9':
+        ## USED ##
+        sigma = 0.03
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = np.array([45, 1.5, 1])
+        prop = prop / prop.sum()
+        return TruncatedMultiNormalD(
+            prop.tolist(),
+            [np.array([0.5, 0.5]), np.array([0.65, 0.7]), np.array([0.69, 0.75])],
+            [np.array([[0.05, 0], [0, 0.05]]), m2 / 15, m1 / 15],
             code=code
         )
     elif code == 'lap1':

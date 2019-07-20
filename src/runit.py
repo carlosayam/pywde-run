@@ -12,7 +12,7 @@ import numpy as np
 import scipy.integrate as integrate
 
 from dist_codes import dist_from_code
-from common import *
+from common import NUM_SAMPLES, sample_name, results_name
 from pywde.square_root_estimator import WaveletDensityEstimator
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 

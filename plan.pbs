@@ -20,8 +20,8 @@ mkdir -p $RESP_DIR/
 cd $RESP_DIR/..
 
 . $SW_DIR/.venv/bin/activate
-export PYTHONPATH=$SW_DIR
+export PYTHONPATH=$SW_DIR/src
 export LC_ALL=en_AU.utf8
 export LANG=en_AU.utf8
-python3 $SW_DIR/runit.py "${VARS[@]}"
+python3 $SW_DIR/src/runit.py "${VARS[@]}"
 
