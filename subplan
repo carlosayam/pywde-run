@@ -4,45 +4,91 @@ from __future__ import print_function
 import subprocess
 import os
 import sys
+import itertools as itt
+from tempfile import mkstemp
 from datetime import timedelta
 
-QSUB = '/opt/torque/bin/qsub'
+import click
+
+QSUB = '/opt/pbs/bin/qsub'
 RESP = 'RESP'
 
 
-def gen_samples_walltime(dist_code, num_obvs):
-    return timedelta(seconds=num_obvs * 90.0 / 1000 + 30.0)
+PLAN = """#!/bin/bash
+#PBS -l nodes=1:ppn=1
+#PBS -l mem=4gb
 
-def estimate_walltime(command, args):
-    if command == 'gen-samples':
-        dist_code = args[0]
-        num_obvs = int(args[1])
-        return gen_samples_walltime(dist_code, num_obvs)
+module purge
+module add python/3.6.5
 
-def popen_args(env):
-    jname = sys.argv[0]
-    meth_call = sys.argv[1]
-    wtime = str(estimate_walltime(meth_call, sys.argv[2:]))
-    opts = ' '.join(["'%s'" % v for v in sys.argv[1:]])
+RESP_DIR="$PBS_O_HOME/RESP"
+SW_DIR="$PBS_O_HOME/WDE/exp01/pywde-run"
+
+mkdir -p $RESP_DIR/
+cd $RESP_DIR/..
+
+. $SW_DIR/.venv/bin/activate
+export PYTHONPATH=$SW_DIR/src
+export LC_ALL=en_AU.utf8
+export LANG=en_AU.utf8
+"""
+
+
+def popen_args(fname, jname, wtime):
     env = os.environ.copy()
-    env['_RET'] = opts
     args = [QSUB,
             '-N', jname,
             '-l', 'walltime=%s' % wtime,
-            '-v', '_RET',
-            '%s/WDE/pywde-run/plan.pbs' % env['HOME']
+            fname
             ]
     cwd = '%s/%s/job.output' % (env['HOME'], RESP)
     if not os.path.exists(cwd):
         os.makedirs(cwd)
-    return args, env, cwd
+    return args, cwd
 
 
+@click.group()
 def main():
-    args, env, cwd = popen_args(os.environ.copy())
-    print('submitting: plan.pbs', env['_RET'])
-    ret = subprocess.call(args, env=env, cwd=cwd)
-    exit(ret)
+    pass
+
+
+@main.command()
+def batch_samples():
+    """
+    Launch jobs to generate samples
+    """
+
+    def gen_samples_walltime(num_obvs):
+        return num_obvs * 90.0 / 1000 + 30.0
+
+    dists = ['mix8', 'tmx4', 'mix9', 'mix6']
+    num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000, 6500]
+    tot_time = 0.0
+    jobs = []
+    for dist, nobs in itt.product(dists, num_obvs):
+        tot_time += gen_samples_walltime(nobs)
+        jobs.append(('gen-samples', (dist, str(nobs))))
+        if tot_time > 3600:
+            gen_and_launch(jobs, tot_time)
+            tot_time = 0.0
+            jobs = []
+    if len(jobs) > 0:
+        gen_and_launch(jobs, tot_time)
+
+
+def gen_and_launch(jobs, tot_time):
+    os.makedirs('RESP/plans', exist_ok=True)
+    ofd, fname = mkstemp(prefix='gen-samples-', suffix='.pbs', dir='RESP/plans', text=True)
+    with os.fdopen(ofd, 'wt') as fh:
+        fh.write(PLAN)
+        for job in jobs:
+            command, params = job
+            params = ' '.join(params)
+            line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
+            fh.write(line)
+    args, cwd = popen_args(fname, 'GEN-SAMPLES', timedelta(seconds=tot_time))
+    print(args)
+    ##subprocess.call(args)
 
 
 if __name__ == '__main__':
