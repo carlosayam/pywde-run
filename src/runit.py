@@ -12,67 +12,10 @@ import numpy as np
 import scipy.integrate as integrate
 
 from dist_codes import dist_from_code
-from common import NUM_SAMPLES, sample_name, results_name
+from common import NUM_SAMPLES, sample_name, results_name, grid_as_vector, calc_maxv, hellinger_distance, hellinger_distance_pdf
 from pywde.square_root_estimator import WaveletDensityEstimator
+from pywde.spwde import SPWDE
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
-
-
-# a 2d grid of [0,1], n x n, rendered as array of (n^2,2)
-def grid_as_vector(n):
-    x = np.linspace(0, 1, n)
-    y = np.linspace(0, 1, n)
-    return np.meshgrid(x, y)
-
-
-def calc_maxv(dist):
-    grid_n = 70
-    xx, yy = grid_as_vector(grid_n)
-    zz = dist.pdf((xx, yy))
-    print('sum=', zz.mean())
-    zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
-    print('int =', zz_sum)
-    return (zz / zz_sum).max()
-
-
-def hellinger_distance_wip(dist, dist_est):
-    # import code
-    # code.interact(local=locals())
-    def ferr(x, y):
-        args = np.array([(x, y)])
-        pdf_vals = np.sqrt(dist.pdf(args))
-        est_vals = np.sqrt(dist_est.pdf(args))/corr_factor
-        return ((pdf_vals - est_vals) ** 2)[0]
-    def pdf(x, y):
-        est_vals = dist_est.pdf(np.array([(x, y)]))
-        return est_vals[0]
-    corr_factor = integrate.dblquad(pdf, 0.0, 1.0, lambda x:0.0, lambda x:1.0)
-    err = integrate.dblquad(ferr, 0.0, 1.0, lambda x: 0.0, lambda x: 1.0)
-    return err, corr_factor
-
-
-def hellinger_distance(dist, dist_est):
-    grid = grid_as_vector(256)
-    pdf_vals = dist.pdf(grid)
-    #print('DIST:', pdf_vals.mean())
-    pdf_vals = pdf_vals / pdf_vals.mean()
-    pdf_vals = np.sqrt(pdf_vals)
-    if isinstance(dist_est, KDEMultivariate):
-        X, Y = grid
-        grid2 = np.array((X.flatten(), Y.flatten())).T
-        vals = dist_est.pdf(grid2)
-        pred_vals = vals.reshape(X.shape[0], Y.shape[0])
-    else:
-        pred_vals = dist_est.pdf(grid)
-    #print('WDE:', pred_vals.mean())
-    corr_factor = pred_vals.mean()
-    # print('corr factor = %g' % corr_factor)
-    pred_vals = pred_vals / corr_factor
-    pred_vals = np.sqrt(pred_vals)
-    diff = pdf_vals - pred_vals
-    err = (diff * diff).mean()  ## !!! /2
-    return err, corr_factor
-
-
 
 
 Result = namedtuple('Result', [
@@ -177,6 +120,47 @@ def gen_samples(dist_code, num_obvs):
         print('.', end='')
         sys.stdout.flush()
     print()
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('results', type=click.Path(file_okay=True, dir_okay=False, writable=True))
+def bestj_task(dist_code, num_obvs, sample_no, wave_name, results):
+    "Run all stuff for 1 task"
+    dist = dist_from_code(dist_code)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+
+    def _kde():
+        t0 = datetime.now()
+        kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
+        elapsed = (datetime.now() - t0).total_seconds()
+        hd, corr_factor = hellinger_distance(dist, kde)
+        return (dist_code, num_obvs, sample_no, 'KDE', '', '', 0, False, 0.0, hd, elapsed)
+
+    def _bestj(kind, mode):
+        spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
+        spwde.best_j(data, mode=mode)
+        for data_for_j in spwde.best_j_data:
+            j, is_best, b_hat_j, pdf, elapsed  = data_for_j
+            hd, corr_factor = hellinger_distance_pdf(dist, pdf)
+            yield (dist_code, num_obvs, sample_no, 'WDE', wave_name, kind, j, is_best, b_hat_j, hd, elapsed)
+
+    with open(results, 'a') as fh:
+        writer = csv.writer(fh, delimiter='\t')
+        row = list(_kde())
+        print(row)
+        writer.writerow(row)
+        for row in _bestj('normed', SPWDE.MODE_NORMED):
+            print(row)
+            writer.writerow(row)
+        for row in _bestj('diff', SPWDE.MODE_DIFF):
+            print(row)
+            writer.writerow(row)
 
 
 @main.command()

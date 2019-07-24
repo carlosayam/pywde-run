@@ -24,7 +24,7 @@ module add python/3.6.5
 RESP_DIR="$PBS_O_HOME/RESP"
 SW_DIR="$PBS_O_HOME/WDE/exp01/pywde-run"
 
-mkdir -p $RESP_DIR/
+mkdir -p $RESP_DIR/exp01
 cd $RESP_DIR/..
 
 . $SW_DIR/.venv/bin/activate
@@ -76,9 +76,47 @@ def batch_samples():
         gen_and_launch(jobs, tot_time)
 
 
+@main.command()
+def batch_bestj():
+    """
+    Launch jobs to process bestj
+    """
+
+    def walltime(num):
+        return 125 + 0.5 * num + 0.00025 * num * num
+
+    num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
+    plans = [
+        ('mix8', ['db4', 'sym6']),
+        ('tmx4', ('sym6', 'bior2.8')),
+        ('mix9', ('db4', 'sym6')),
+        ('mix6', ('sym6', 'bior3.9')),
+    ]
+    tot_time = 0.0
+    jobs, resp_num = [], 1
+    resp_name = lambda n: 'RESP/exp01/results-%05d.tab' % n
+    os.makedirs('RESP/exp01', exist_ok=True)
+    for a_plan in plans:
+        dist_code, wavelets = a_plan
+        for wave_name, num, sample_no in itt.product(wavelets, num_obvs, range(100)):
+            tot_time += int(1.25 * walltime(num))
+            job_data = ('best-j', (dist_code, str(num), str(sample_no + 1), wave_name, resp_name(resp_num)))
+            jobs.append(job_data)
+            if tot_time > 3600*4:
+                gen_and_launch(jobs, tot_time)
+                tot_time = 0.0
+                jobs = []
+                resp_num += 1
+    if len(jobs) > 0:
+        gen_and_launch(jobs, tot_time)
+    print('TOTAL JOBS :', resp_num)
+
+
+
 def gen_and_launch(jobs, tot_time):
     os.makedirs('RESP/plans', exist_ok=True)
     ofd, fname = mkstemp(prefix='gen-samples-', suffix='.pbs', dir='RESP/plans', text=True)
+    tot_time = (60*15) * (int(tot_time / (60*15))+1)
     with os.fdopen(ofd, 'wt') as fh:
         fh.write(PLAN)
         for job in jobs:
@@ -87,8 +125,8 @@ def gen_and_launch(jobs, tot_time):
             line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
             fh.write(line)
     args, cwd = popen_args(fname, 'GEN-SAMPLES', timedelta(seconds=tot_time))
-    print(args)
-    ##subprocess.call(args)
+    print(' '.join(args))
+    ## subprocess.call(args)
 
 
 if __name__ == '__main__':

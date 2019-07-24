@@ -13,7 +13,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from pywde.square_root_estimator import WaveletDensityEstimator
 from pywde.spwde import SPWDE
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
-from plotlib import plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour, do_dist_contour, plot_energy, plot_trace
+from plotlib import (plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour,
+                     do_dist_contour, plot_energy, plot_trace, do_plot_pdf, do_pdf_contour)
 
 
 def read_data(fname):
@@ -161,7 +162,7 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 @click.argument('num_obvs', type=int)
 @click.argument('sample_no', type=int)
 @click.argument('wave_name')
-@click.option('--k', type=int)
+@click.option('--k', type=int, default=1)
 @click.option('--j0', type=int, default=0)
 @click.option('--contour', is_flag=True)
 def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
@@ -183,18 +184,14 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
     spwde.best_j(data, mode=spwde.MODE_NORMED)
     for data_for_j in spwde.best_j_data:
-        j, b_hat_j, pdf = data_for_j
-
-    return
-    # if hasattr(wde, 'threshold'):
-    #     plot_energy(wde, str(png_file).replace('.png', '-energy.png'))
-    # if hasattr(wde, 'trace_v'):
-    #     plot_trace(wde, str(png_file).replace('.png', '-trace.png'))
-    # if kwargs['contour']:
-    #     do_wde_contour(wde, png_file, dist)
-    # else:
-    #     do_plot_wde(wde, png_file, dist, 'view')
-
+        j, is_best, b_hat_j, pdf, elapsed = data_for_j
+        print(j, is_best, '\tB hat =', b_hat_j, 't =', elapsed)
+        if is_best:
+            pdf.name = pdf.name + ' (best)'
+        if kwargs['contour']:
+            do_pdf_contour(pdf, 'test-%d.png' % j, dist)
+        else:
+            do_plot_pdf(pdf, 'test-%d.png' % j, dist, 'view')
 
 
 @main.command()

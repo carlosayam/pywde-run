@@ -6,6 +6,7 @@ import scipy.integrate as integrate
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
+from common import hellinger_distance_pdf, hellinger_distance
 
 
 # a 2d grid of [0,1], n x n, rendered as array of (n^2,2)
@@ -53,7 +54,7 @@ def do_dist_contour(fname, dist, data=None):
     max_z = zz.max()
     print('max_z', max_z)
     alpha = 0.7 if data is None else 0.5
-    cs = plt.contour(xx, yy, zz, alpha=alpha, levels=np.linspace(0, max_z, 12))
+    cs = plt.contour(xx, yy, zz, alpha=alpha, levels=np.linspace(0, max_z, 18))
     if data is not None:
         plt.scatter(data[:,0], data[:,1], alpha=0.7, s=3, c='k')
     plt.clabel(cs, inline=1, fontsize=10)
@@ -70,7 +71,6 @@ def do_plot_wde(wde, fname, dist, interact=None):
     zlim = calc_maxv(dist)
     hd, corr_factor = hellinger_distance(dist, wde)
     print(wde.name, 'HD=', hd)
-    ##return
     grid_n = 40 ## 70
     xx, yy = grid_as_vector(grid_n)
     zz = wde.pdf((xx, yy)) / corr_factor
@@ -87,6 +87,55 @@ def do_plot_wde(wde, fname, dist, interact=None):
     else:
         raise ValueError('Unknown plot option %s' % interact)
     print('%s saved' % fname)
+
+
+def do_plot_pdf(pdf, fname, dist, interact=None):
+    print('Plotting %s' % fname)
+    zlim = calc_maxv(dist)
+    hd, corr_factor = hellinger_distance_pdf(dist, pdf)
+    print('HD=', hd)
+    grid_n = 70 ## 70
+    xx, yy = grid_as_vector(grid_n)
+    pp = np.array((xx, yy))
+    pp = pp.T.reshape(-1, 2)
+    zz = pdf(pp) / corr_factor
+    zz = zz.reshape((grid_n, grid_n)).T
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
+    ax.set_zlim(0, zlim)
+    ax.set_title(pdf.name + ('\nHD = %g' % hd), wrap=True)
+    if interact == 'view':
+        plt.show()
+        ##plt.savefig(fname)
+    elif interact == 'save':
+        print('Saving %s' % fname)
+        plt.savefig(fname)
+    else:
+        raise ValueError('Unknown plot option %s' % interact)
+
+
+def do_pdf_contour(pdf, fname, dist):
+    print('Plotting %s' % fname)
+    hd, corr_factor = hellinger_distance_pdf(dist, pdf)
+    print(pdf.name, 'HD=', hd)
+    grid_n = 70 ## 70
+    xx, yy = grid_as_vector(grid_n)
+    xx, yy = grid_as_vector(grid_n)
+    pp = np.array((xx, yy))
+    pp = pp.T.reshape(-1, 2)
+    zz = pdf(pp) / corr_factor
+    zz = zz.reshape((grid_n, grid_n)).T
+    max_z = zz.max()
+    fig = plt.figure()
+    plt.title(pdf.name + ('\nHD = %g' % hd), wrap=True)
+    print('max_z', max_z)
+    cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 18))
+    plt.clabel(cs, inline=1, fontsize=10)
+    plt.show()
+    ##plt.savefig(fname)
+    print('%s saved' % fname)
+
 
 
 def do_wde_contour(wde, fname, dist):
@@ -177,7 +226,7 @@ def do_plot_kde(kde, fname, dist, zlim):
     print('Plotting %s' % fname)
     hd, corr_factor = hellinger_distance(dist, kde)
     print('kde HD=', hd)
-    grid_n = 40 ## 70
+    grid_n = 70 ## 70
     xx, yy = grid_as_vector(grid_n)
     grid2 = np.array((xx.flatten(), yy.flatten())).T
     vals = kde.pdf(grid2)
@@ -210,7 +259,7 @@ def do_kde_contour(kde, fname, dist, zlim):
     fig = plt.figure()
     max_z = zz.max()
     print('max_z', max_z)
-    cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 12))
+    cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 18))
     plt.title(('KDE %d bw=%s' % (kde.nobs, str(kde.bw))) + ('\nHD = %g' % hd))
     plt.clabel(cs, inline=1, fontsize=10)
     #plt.scatter(data[:,0], data[:,1], s=2, alpha=0.0001)
@@ -232,26 +281,4 @@ def hellinger_distance_wip(dist, dist_est):
         return est_vals[0]
     corr_factor = integrate.dblquad(pdf, 0.0, 1.0, lambda x:0.0, lambda x:1.0)
     err = integrate.dblquad(ferr, 0.0, 1.0, lambda x: 0.0, lambda x: 1.0)
-    return err, corr_factor
-
-
-def hellinger_distance(dist, dist_est):
-    grid = grid_as_vector(256)
-    pdf_vals = dist.pdf(grid)
-    #print('DIST:', pdf_vals.mean())
-    pdf_vals = pdf_vals / pdf_vals.mean()
-    pdf_vals = np.sqrt(pdf_vals)
-    if isinstance(dist_est, KDEMultivariate):
-        X, Y = grid
-        grid2 = np.array((X.flatten(), Y.flatten())).T
-        vals = dist_est.pdf(grid2)
-        pred_vals = vals.reshape(X.shape[0], Y.shape[0])
-    else:
-        pred_vals = dist_est.pdf(grid)
-    corr_factor = pred_vals.mean()
-    print('corr factor = %g' % corr_factor)
-    pred_vals = pred_vals / corr_factor
-    pred_vals = np.sqrt(pred_vals)
-    diff = pdf_vals - pred_vals
-    err = (diff * diff).mean()  ## !!! /2
     return err, corr_factor
