@@ -2,10 +2,12 @@ import atexit
 import csv
 import itertools as itt
 import sys
+from pathlib import Path
 from datetime import datetime
 
+
 import click
-import numpy as np
+import pandas as pd
 
 from dist_codes import dist_from_code
 from common import *
@@ -50,6 +52,13 @@ def plot_true(dist_code, **kwargs):
     else:
         plot_dist(name, dist)
 
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def plot_exp01(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp01 import do_plot_exp01
+    do_plot_exp01(directory)
 
 
 @main.command()
