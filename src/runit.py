@@ -164,6 +164,23 @@ def bestj_task(dist_code, num_obvs, sample_no, wave_name, results):
 
 
 @main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp01_plots(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp01 import do_plot_exp01
+    do_plot_exp01(directory)
+
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp01_compare(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp01 import do_compare_algos
+    do_compare_algos(directory)
+
+
+
+@main.command()
 @click.argument('dist_code')
 @click.argument('num_obvs', type=int)
 @click.argument('sample_no', type=int, default='0')

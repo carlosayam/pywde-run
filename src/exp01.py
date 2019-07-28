@@ -1,8 +1,74 @@
 import os
+import sys
+import itertools as itt
 import numpy as np
 import pandas as pd
+
 from pathlib import Path
 from dist_codes import dist_from_code
+
+
+def do_compare_algos(directory):
+    plt, sns = _init_()
+    directory = Path(directory)
+    df = _load_data(directory)
+    nums = [100, 500, 1000, 1500, 2500, 3500, 5000]
+    plans = [
+        ('mix8', ['db4', 'sym6']),
+        ('tmx4', ('sym6', 'bior2.8')),
+        ('mix9', ('db4', 'sym6')),
+        ('mix6', ('sym6', 'bior3.9')),
+    ]
+    # dist_code, wave_name, num_obvs, sample_no
+    # -> best_j per HD
+    resp = {}
+    os.makedirs(str(directory / 'plots2'), exist_ok=True)
+    lines = []
+    lines.append(_HTML_HEAD)
+    for a_plan in plans:
+        dist_code, wavelets = a_plan
+        print(dist_code)
+        fig, axs = plt.subplots(1, 2, sharey=True, sharex=True, figsize=(9, 2))
+        for wave_name, ax1 in zip(wavelets, axs):
+            series = {'num_obvs': [], 'algorithm': [], 'deltaj': []}
+            for num_obvs, bestj_algo in itt.product(nums, ['normed', 'diff']):
+                df1 = df[((df.dist_code == dist_code) & (df.num_obvs == num_obvs)
+                          & (df.wave_name == wave_name) & (df.bestj_algo == bestj_algo))]
+                # sample_no, j
+                j_hd = df1.loc[df1.groupby(['sample_no'])['hd'].idxmin()]['j']
+                j_algo = df1.loc[df1.groupby(['sample_no'])['b_hat_j'].idxmax()]['j']
+                #print(j_hd.values)
+                #print(j_algo.values)
+                series['num_obvs'].append('%4d' % num_obvs)
+                series['algorithm'].append(bestj_algo)
+                series['deltaj'].append((j_algo.values - j_hd.values).mean())
+            data = pd.DataFrame(series)
+            sns.lineplot(x='num_obvs', y='deltaj', hue='algorithm', data=data, ax=ax1, dashes=True)
+            ax1.set_title('%s' % wave_name)
+            ax1.set(xlabel='Sample size', ylabel='$\hat{j} - J$')
+            ax1.grid(True)
+        lines.append('<h2>%s</h2>' % dist_code)
+        figname = 'plot-%s.png' % dist_code
+        full_figname = str(directory / 'plots2' / figname)
+        fig.savefig(full_figname)
+        plt.close(fig)
+        line = '<img src="%s" alt="%s" style="width:70%%"/>\n' % (figname, dist_code)
+        lines.append('<div>\n')
+        lines.append(line)
+        fig = _plot_true(plt, dist_code)
+        figname = 'plot-%s-true.png' % (dist_code,)
+        full_figname = str(directory / 'plots2' / figname)
+        fig.savefig(full_figname)
+        alt_tit = '%s, true' % (dist_code,)
+        line = '<img src="%s" alt="%s" style="width:20%%"/>\n' % (figname, alt_tit)
+        lines.append(line)
+        lines.append('</div>\n')
+        plt.close(fig)
+    lines.append(_HTML_END)
+    with open(str( directory / 'plots2' / 'plots.html'), 'w') as fh:
+        fh.writelines(lines)
+    print('> plots.html')
+
 
 
 def do_plot_exp01(directory):
@@ -95,11 +161,13 @@ def grid_as_vector(n):
 
 
 
-def _init_():
+def _init_(is_agg=True):
     import matplotlib
-    matplotlib.use('Agg')
+    if is_agg:
+        matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from mpl_toolkits.mplot3d import Axes3D
     return plt, sns
 
 
