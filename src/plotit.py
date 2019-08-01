@@ -196,6 +196,43 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 
 
 @main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('delta_j', type=int)
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--contour', is_flag=True)
+def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, **kwargs):
+    """
+    Calculates WDE for given k, j0 and delta-j for all possible options
+    """
+    dist = dist_from_code(dist_code)
+    k = kwargs['k']
+    what = 'best_j' + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
+    png_file = png_name(dist_code, num_obvs, sample_no, what)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
+    # wde.best_j(data)
+    spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
+    spwde.best_c(data, delta_j)
+    xy = np.array(spwde.best_c_data)
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$,"
+             r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$") % (dist_code, wave_name, j0, delta_j)
+    ax = sns.lineplot(xy[:,0], xy[:,1])
+    ax.set_title(title)
+    ax.set(xlabel="$C$", ylabel=r"$HD_2(C)$", )
+    plt.show()
+
+@main.command()
 @click.argument('dist_name', metavar="DIST_CODE")
 @click.argument('wave_name', metavar="WAVE_CODE")
 @click.argument('num', type=int)
