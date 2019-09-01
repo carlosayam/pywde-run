@@ -132,8 +132,8 @@ def do_pdf_contour(pdf, fname, dist):
     print('max_z', max_z)
     cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 18))
     plt.clabel(cs, inline=1, fontsize=10)
-    plt.show()
-    ##plt.savefig(fname)
+    ## plt.show()
+    plt.savefig(fname)
     print('%s saved' % fname)
 
 
@@ -207,17 +207,15 @@ def plot_trace(wde, fname):
     for jj in range(int(maxj)+1):
         xs = xx[vals[:,4] == jj]
         ys = yy[vals[:,4] == jj]
-        plt.plot(xs, ys, '.', label='j=%d' % jj)
+        plt.plot(xs, 1 - ys, '.', label='$\Delta j$ = +%d' % (jj+1), markersize=1)
     # plt.plot(xx, vals[:,2], 'r.')
     # plt.plot(xx, vals[:,2] - vals[:,3], 'k.')
     plt.xlabel('Step')
-    plt.ylabel('$HD_1$')
+    plt.ylabel('$\hat{\mathcal{B}}_{[o]}$')
     plt.legend()
     lbl = random.randint(1,10000)
-    plt.title('Trace (%s)' % str(lbl))
-    print('Title >', lbl)
     plt.show()
-    plt.savefig(fname)
+    # plt.savefig(fname)
     plt.close()
     print('%s saved' % fname)
 

@@ -163,10 +163,11 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 @click.argument('num_obvs', type=int)
 @click.argument('sample_no', type=int)
 @click.argument('wave_name')
+@click.argument('mode', type=click.Choice([SPWDE.MODE_DIFF, SPWDE.MODE_NORMED]))
 @click.option('--k', type=int, default=1)
 @click.option('--j0', type=int, default=0)
 @click.option('--contour', is_flag=True)
-def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
+def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
     """
     Calculates WDE for given k, j0 and delta-j for all possible options
     """
@@ -183,16 +184,16 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, **kwargs):
     # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
-    spwde.best_j(data, mode=spwde.MODE_NORMED)
+    spwde.best_j(data, mode=mode)
     for data_for_j in spwde.best_j_data:
         j, is_best, b_hat_j, pdf, elapsed = data_for_j
         print(j, is_best, '\tB hat =', b_hat_j, 't =', elapsed)
         if is_best:
-            pdf.name = pdf.name + ' (best)'
+            pdf.name = pdf.name + (' (best %s)' % mode)
         if kwargs['contour']:
-            do_pdf_contour(pdf, 'test-%d.png' % j, dist)
+            do_pdf_contour(pdf, 'test2-%d.png' % j, dist)
         else:
-            do_plot_pdf(pdf, 'test-%d.png' % j, dist, 'view')
+            do_plot_pdf(pdf, 'test2-%d.png' % j, dist, 'view')
 
 
 @main.command()
@@ -231,6 +232,13 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, **kwargs):
     ax.set_title(title)
     ax.set(xlabel="$C$", ylabel=r"$HD_2(C)$", )
     plt.show()
+    pdf = spwde.best_c_found[0]
+    cc = spwde.best_c_found[1]
+    if kwargs['contour']:
+        do_pdf_contour(pdf, 'test3-%f.png' % cc, dist)
+    else:
+        do_plot_pdf(pdf, 'test3-%f.png' % cc, dist, 'view')
+
 
 @main.command()
 @click.argument('dist_name', metavar="DIST_CODE")
