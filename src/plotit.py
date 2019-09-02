@@ -202,10 +202,11 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
 @click.argument('sample_no', type=int)
 @click.argument('wave_name')
 @click.argument('delta_j', type=int)
+@click.argument('mode', type=click.Choice([SPWDE.MODE_DIFF, SPWDE.MODE_NORMED]))
 @click.option('--k', type=int, default=1)
 @click.option('--j0', type=int, default=0)
 @click.option('--contour', is_flag=True)
-def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, **kwargs):
+def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwargs):
     """
     Calculates WDE for given k, j0 and delta-j for all possible options
     """
@@ -222,7 +223,7 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, **kwargs):
     # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
-    spwde.best_c(data, delta_j)
+    spwde.best_c(data, delta_j, mode)
     xy = np.array(spwde.best_c_data)
     import seaborn as sns
     import matplotlib.pyplot as plt
