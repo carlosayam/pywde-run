@@ -24,7 +24,7 @@ module add python/3.6.5
 RESP_DIR="$PBS_O_HOME/RESP"
 SW_DIR="$PBS_O_HOME/WDE/exp01/pywde-run"
 
-mkdir -p $RESP_DIR/exp01
+mkdir -p $RESP_DIR/%(exp_dir)s
 cd $RESP_DIR/..
 
 . $SW_DIR/.venv/bin/activate
@@ -112,19 +112,56 @@ def batch_bestj():
     print('TOTAL JOBS :', resp_num)
 
 
+@main.command()
+def batch_bestc():
+    """
+    Launch jobs to process best-c
+    """
 
-def gen_and_launch(jobs, tot_time):
+    def walltime(num):
+        "Estimated walltime in secs"
+        return 50 + 1.75 * num
+
+    num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
+    plans = [
+        ('mix8', ['db4', 'sym6']),
+        ('tmx4', ('sym6', 'bior2.8')),
+        ('mix9', ('db4', 'sym6')),
+        ('mix6', ('sym6', 'bior3.9')),
+    ]
+    tot_time = 0.0
+    jobs, resp_num = [], 1
+    resp_name = lambda n: 'RESP/exp02/results-%05d.tab' % n
+    os.makedirs('RESP/exp02', exist_ok=True)
+    for a_plan in plans:
+        dist_code, wavelets = a_plan
+        for wave_name, num, sample_no in itt.product(wavelets, num_obvs, range(100)):
+            tot_time += int(1.25 * walltime(num))
+            job_data = ('best-c', (dist_code, str(num), str(sample_no + 1), wave_name, resp_name(resp_num)))
+            jobs.append(job_data)
+            if tot_time > 3600*3:
+                gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02')
+                tot_time = 0.0
+                jobs = []
+                resp_num += 1
+    if len(jobs) > 0:
+        gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02')
+    print('TOTAL JOBS :', resp_num)
+
+
+
+def gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp01'):
     os.makedirs('RESP/plans', exist_ok=True)
-    ofd, fname = mkstemp(prefix='gen-samples-', suffix='.pbs', dir='RESP/plans', text=True)
+    ofd, fname = mkstemp(prefix='%s-' % job_name, suffix='.pbs', dir='RESP/plans', text=True)
     tot_time = (60*15) * (int(tot_time / (60*15))+1)
     with os.fdopen(ofd, 'wt') as fh:
-        fh.write(PLAN)
+        fh.write(PLAN % {'exp_dir': exp_dir})
         for job in jobs:
             command, params = job
             params = ' '.join(params)
             line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
             fh.write(line)
-    args, cwd = popen_args(fname, 'GEN-SAMPLES', timedelta(seconds=tot_time))
+    args, cwd = popen_args(fname, job_name.upper(), timedelta(seconds=tot_time))
     print(' '.join(args))
     ## subprocess.call(args)
 

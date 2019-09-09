@@ -164,6 +164,65 @@ def bestj_task(dist_code, num_obvs, sample_no, wave_name, results):
 
 
 @main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('results', type=click.Path(file_okay=True, dir_okay=False, writable=True))
+def best_c(dist_code, num_obvs, sample_no, wave_name, results):
+    "Run all stuff for 1 task"
+    dist = dist_from_code(dist_code)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+
+    def _kde():
+        t0 = datetime.now()
+        kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
+        elapsed = (datetime.now() - t0).total_seconds()
+        hd, corr_factor = hellinger_distance(dist, kde)
+        return (dist_code, num_obvs, sample_no, 'KDE', '', '', 0,
+                0, 0, 0.0, hd, elapsed)
+
+    def calc_bestj(mode):
+        t0 = datetime.now()
+        spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
+        best_j = spwde.best_j(data, mode=mode, stop_on_max=True)
+        elapsed = (datetime.now() - t0).total_seconds()
+        return best_j, elapsed
+
+
+    def _bestc(best_j_dict):
+        for mode, j_offset, ex_delta in itt.product((SPWDE.MODE_NORMED, SPWDE.MODE_DIFF), range(-2, 1), (0, 1, 2)):
+            best_j, elapsed0 = best_j_dict[mode]
+            delta_j = - j_offset + ex_delta
+            if delta_j == 0:
+                continue
+            the_j = best_j + j_offset
+            t0 = datetime.now()
+            spwde = SPWDE(((wave_name, the_j), (wave_name, the_j)), k=1)
+            spwde.best_c(data, delta_j, mode)
+            elapsed = (datetime.now() - t0).total_seconds()
+            pdf, best_c_data = spwde.best_c_found
+            hd, corr_factor = hellinger_distance_pdf(dist, pdf)
+            b_hat_j = best_c_data[1]
+            yield (dist_code, num_obvs, sample_no, 'WDE', wave_name, mode, best_j,
+                   the_j, delta_j, b_hat_j, hd, elapsed0 + elapsed)
+
+
+
+    with open(results, 'a') as fh:
+        writer = csv.writer(fh, delimiter='\t')
+        row = list(_kde())
+        print(row)
+        writer.writerow(row)
+        best_j_dict = {mode: calc_bestj(mode) for mode in [SPWDE.MODE_DIFF, SPWDE.MODE_NORMED]}
+        for row in _bestc(best_j_dict):
+            print(row)
+            writer.writerow(row)
+
+
+@main.command()
 @click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
 def exp01_plots(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"

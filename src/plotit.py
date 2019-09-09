@@ -185,6 +185,7 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
     spwde.best_j(data, mode=mode)
+    # return # << !!!
     for data_for_j in spwde.best_j_data:
         j, is_best, b_hat_j, pdf, elapsed = data_for_j
         print(j, is_best, '\tB hat =', b_hat_j, 't =', elapsed)
@@ -208,7 +209,7 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
 @click.option('--contour', is_flag=True)
 def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwargs):
     """
-    Calculates WDE for given k, j0 and delta-j for all possible options
+    Calculates WDE for best threshold options
     """
     dist = dist_from_code(dist_code)
     k = kwargs['k']
@@ -224,22 +225,73 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwar
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
     spwde.best_c(data, delta_j, mode)
-    xy = np.array(spwde.best_c_data)
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-    title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$,"
-             r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$") % (dist_code, wave_name, j0, delta_j)
-    ax = sns.lineplot(xy[:,0], xy[:,1])
-    ax.set_title(title)
-    ax.set(xlabel="$C$", ylabel=r"$HD_2(C)$", )
-    plt.show()
+    # return # << !!!
+    if spwde.best_c_data:
+        xy = np.array(spwde.best_c_data)
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$,"
+                 r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$") % (dist_code, wave_name, j0, delta_j)
+        ax = sns.lineplot(xy[:,0], xy[:,1])
+        ax.set_title(title)
+        mode_ix = 1 if mode == SPWDE.MODE_NORMED else 2
+        ax.set(xlabel="$C$", ylabel=r"$HD_%d(C)$" % mode_ix, )
+        ax.fill_between(xy[:,0], xy[:,1]-3*xy[:,2], xy[:,1]+3*xy[:,2], alpha=0.3)
+        plt.show()
     pdf = spwde.best_c_found[0]
     cc = spwde.best_c_found[1]
     if kwargs['contour']:
-        do_pdf_contour(pdf, 'test3-%f.png' % cc, dist)
+        do_pdf_contour(pdf, 'test3-%s.png' % cc, dist)
     else:
-        do_plot_pdf(pdf, 'test3-%f.png' % cc, dist, 'view')
+        do_plot_pdf(pdf, 'test3-%s.png' % cc, dist, 'view')
 
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('delta_j', type=int)
+@click.argument('mode', type=click.Choice([SPWDE.MODE_DIFF, SPWDE.MODE_NORMED]))
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--contour', is_flag=True)
+def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwargs):
+    """
+    Calculate best WDE using greedy optimisation
+    """
+    dist = dist_from_code(dist_code)
+    k = kwargs['k']
+    what = 'best_j' + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
+    png_file = png_name(dist_code, num_obvs, sample_no, what)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
+    # wde.best_j(data)
+    spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
+    spwde.best_greedy(data, delta_j, mode)
+    # return # << !!!
+    if spwde.best_c_data:
+        xy = np.array(spwde.best_c_data)
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$,"
+                 r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$") % (dist_code, wave_name, j0, delta_j)
+        ax = sns.lineplot(xy[:,0], xy[:,1])
+        ax.set_title(title)
+        mode_ix = 1 if mode == SPWDE.MODE_NORMED else 2
+        ax.set(xlabel="$C$", ylabel=r"$HD_%d(C)$" % mode_ix, )
+        plt.show()
+    pdf = spwde.best_c_found[0]
+    cc = spwde.best_c_found[1]
+    if kwargs['contour']:
+        do_pdf_contour(pdf, 'test3-%s.png' % cc, dist)
+    else:
+        do_plot_pdf(pdf, 'test3-%s.png' % cc, dist, 'view')
 
 @main.command()
 @click.argument('dist_name', metavar="DIST_CODE")
