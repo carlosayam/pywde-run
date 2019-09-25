@@ -113,49 +113,60 @@ def batch_bestj():
 
 
 @main.command()
-def batch_bestc():
+@click.argument('num_obvs', type=int)
+def batch_bestc(num_obvs):
     """
     Launch jobs to process best-c
     """
 
     def walltime(num):
         "Estimated walltime in secs"
-        return 50 + 1.75 * num
+        return 100 + 3.50 * num
 
-    num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
+    # num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
     plans = [
         ('mix8', ['db4', 'sym6']),
         ('tmx4', ('sym6', 'bior2.8')),
-        ('mix9', ('db4', 'sym6')),
-        ('mix6', ('sym6', 'bior3.9')),
+        ('mix9', ('sym4', 'db6')),
     ]
     tot_time = 0.0
-    jobs, resp_num = [], 1
-    resp_name = lambda n: 'RESP/exp02/results-%05d.tab' % n
+    resp_name = lambda n: 'RESP/exp02/results-%05d-%05d.tab' % (num_obvs, n)
+    jobs, resp_num, fname = [], 1, resp_name(1)
     os.makedirs('RESP/exp02', exist_ok=True)
+    headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
     for a_plan in plans:
         dist_code, wavelets = a_plan
-        for wave_name, num, sample_no in itt.product(wavelets, num_obvs, range(100)):
-            tot_time += int(1.25 * walltime(num))
-            job_data = ('best-c', (dist_code, str(num), str(sample_no + 1), wave_name, resp_name(resp_num)))
+        if len(jobs) > 0:
+            gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
+            tot_time = 0.0
+            jobs = []
+            resp_num += 1
+            fname = resp_name(resp_num)
+        for wave_name, sample_no in itt.product(wavelets, range(100)):
+            tot_time += int(1.25 * walltime(num_obvs))
+            job_data = ('best-c', (dist_code, str(num_obvs), str(sample_no + 1), wave_name, fname))
             jobs.append(job_data)
             if tot_time > 3600*3:
-                gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02')
+                gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
                 tot_time = 0.0
                 jobs = []
                 resp_num += 1
+                fname = resp_name(resp_num)
     if len(jobs) > 0:
-        gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02')
+        gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
     print('TOTAL JOBS :', resp_num)
 
 
 
-def gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp01'):
+def gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp01', headers=None):
     os.makedirs('RESP/plans', exist_ok=True)
     ofd, fname = mkstemp(prefix='%s-' % job_name, suffix='.pbs', dir='RESP/plans', text=True)
     tot_time = (60*15) * (int(tot_time / (60*15))+1)
     with os.fdopen(ofd, 'wt') as fh:
         fh.write(PLAN % {'exp_dir': exp_dir})
+        fh.write('rm -f "%s"\n' % jobs[0][1][-1])
+        if headers:
+            fh.write('%s\n' % headers)
         for job in jobs:
             command, params = job
             params = ' '.join(params)

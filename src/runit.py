@@ -155,10 +155,10 @@ def bestj_task(dist_code, num_obvs, sample_no, wave_name, results):
         row = list(_kde())
         print(row)
         writer.writerow(row)
-        for row in _bestj('normed', SPWDE.MODE_NORMED):
+        for row in _bestj('normed', SPWDE.TARGET_NORMED):
             print(row)
             writer.writerow(row)
-        for row in _bestj('diff', SPWDE.MODE_DIFF):
+        for row in _bestj('diff', SPWDE.TARGET_DIFF):
             print(row)
             writer.writerow(row)
 
@@ -181,8 +181,8 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
         kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
         elapsed = (datetime.now() - t0).total_seconds()
         hd, corr_factor = hellinger_distance(dist, kde)
-        return (dist_code, num_obvs, sample_no, 'KDE', '', '', 0,
-                0, 0, 0.0, hd, elapsed)
+        return (dist_code, num_obvs, sample_no, 'KDE', '', '', '', 0,
+                0, 0, num_obvs, 0.0, hd, elapsed)
 
     def calc_bestj(mode):
         t0 = datetime.now()
@@ -193,21 +193,26 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
 
 
     def _bestc(best_j_dict):
-        for mode, j_offset, ex_delta in itt.product((SPWDE.MODE_NORMED, SPWDE.MODE_DIFF), range(-2, 1), (0, 1, 2)):
+        for mode, th_mode, j_offset, ex_delta in itt.product(
+                (SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF),
+                (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED),
+                [-1, 0],
+                (0, 1, 2)
+        ):
             best_j, elapsed0 = best_j_dict[mode]
             delta_j = - j_offset + ex_delta
-            if delta_j == 0:
+            if delta_j <= 0:
                 continue
             the_j = best_j + j_offset
             t0 = datetime.now()
             spwde = SPWDE(((wave_name, the_j), (wave_name, the_j)), k=1)
-            spwde.best_c(data, delta_j, mode)
+            spwde.best_c(data, delta_j, mode, th_mode)
             elapsed = (datetime.now() - t0).total_seconds()
             pdf, best_c_data = spwde.best_c_found
             hd, corr_factor = hellinger_distance_pdf(dist, pdf)
-            b_hat_j = best_c_data[1]
-            yield (dist_code, num_obvs, sample_no, 'WDE', wave_name, mode, best_j,
-                   the_j, delta_j, b_hat_j, hd, elapsed0 + elapsed)
+            num_coeffs, b_hat_j = best_c_data[3], best_c_data[1]
+            yield (dist_code, num_obvs, sample_no, 'WDE', wave_name, mode, th_mode, best_j,
+                   the_j, delta_j, num_coeffs, b_hat_j, hd, elapsed0 + elapsed)
 
 
 
@@ -216,7 +221,7 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
         row = list(_kde())
         print(row)
         writer.writerow(row)
-        best_j_dict = {mode: calc_bestj(mode) for mode in [SPWDE.MODE_DIFF, SPWDE.MODE_NORMED]}
+        best_j_dict = {mode: calc_bestj(mode) for mode in [SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]}
         for row in _bestc(best_j_dict):
             print(row)
             writer.writerow(row)

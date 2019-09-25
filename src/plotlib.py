@@ -5,6 +5,7 @@ import scipy.integrate as integrate
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
+from scipy import interpolate
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from common import hellinger_distance_pdf, hellinger_distance
 
