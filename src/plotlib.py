@@ -223,6 +223,7 @@ def plot_trace(wde, fname):
 
 def do_plot_kde(kde, fname, dist, zlim):
     print('Plotting %s' % fname)
+    zlim = calc_maxv(dist)
     hd, corr_factor = hellinger_distance(dist, kde)
     print('kde HD=', hd)
     grid_n = 70 ## 70
