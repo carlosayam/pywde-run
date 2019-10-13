@@ -61,19 +61,19 @@ def batch_samples():
     def gen_samples_walltime(num_obvs):
         return num_obvs * 90.0 / 1000 + 30.0
 
-    dists = ['mix8', 'tmx4', 'mix9', 'mix6']
-    num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000, 6500]
+    dists = ['ex01', 'ex02', 'ex03', 'ex04']
+    num_obvs = [250, 500, 1000, 1500, 2000, 3000, 4000]
     tot_time = 0.0
     jobs = []
     for dist, nobs in itt.product(dists, num_obvs):
         tot_time += gen_samples_walltime(nobs)
         jobs.append(('gen-samples', (dist, str(nobs))))
         if tot_time > 3600:
-            gen_and_launch(jobs, tot_time)
+            gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp02')
             tot_time = 0.0
             jobs = []
     if len(jobs) > 0:
-        gen_and_launch(jobs, tot_time)
+        gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp02')
 
 
 @main.command()
@@ -121,13 +121,14 @@ def batch_bestc(num_obvs):
 
     def walltime(num):
         "Estimated walltime in secs"
-        return 100 + 3.50 * num
+        return 1.2 * num
 
     # num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
     plans = [
-        ('mix8', ['db4', 'sym6']),
-        ('tmx4', ('sym6', 'bior2.8')),
-        ('mix9', ('sym4', 'db6')),
+        ('ex01', ['sym3', 'sym4', 'db4']),
+        ('ex02', ['sym3', 'sym4', 'db4']),
+        ('ex03', ['sym3', 'sym4', 'db4']),
+        ('ex04', ['sym3', 'sym4', 'db4']),
     ]
     tot_time = 0.0
     resp_name = lambda n: 'RESP/exp02/results-%05d-%05d.tab' % (num_obvs, n)

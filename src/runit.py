@@ -193,17 +193,13 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
 
 
     def _bestc(best_j_dict):
-        for mode, th_mode, j_offset, ex_delta in itt.product(
+        for mode, th_mode, delta_j in itt.product(
                 (SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF),
-                (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED),
-                [-1, 0],
-                (0, 1, 2)
+                (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD, SPWDE.TH_EMP_STD_ADJ),
+                (1, 2, 3)
         ):
             best_j, elapsed0 = best_j_dict[mode]
-            delta_j = - j_offset + ex_delta
-            if delta_j <= 0:
-                continue
-            the_j = best_j + j_offset
+            the_j = best_j - delta_j
             t0 = datetime.now()
             spwde = SPWDE(((wave_name, the_j), (wave_name, the_j)), k=1)
             spwde.best_c(data, delta_j, mode, th_mode)
