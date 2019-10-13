@@ -521,6 +521,91 @@ def dist_from_code(code):
             [np.array([[0.05, 0], [0, 0.05]]), m2 / 15, m1 / 15],
             code=code
         )
+    elif code == 'ex01':
+        ## USED ##
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = np.array([20, 5, 2])
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            [np.array([0.45, 0.45]), np.array([0.7, 0.7]), np.array([0.45, 0.45])],
+            [m2/5, m1/100, m1/150],
+            code=code
+        )
+        ##print(resp.mathematica())
+        return resp
+    elif code == 'ex02':
+        ## USED ##
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = np.array([10, 10])
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            [np.array([0.45, 0.45]), np.array([0.7, 0.7])],
+            [m2 / 10, m1 / 80],
+            code=code
+        )
+        ##print(resp.mathematica())
+        return resp
+    elif code == 'ex03':
+        ## USED ##
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = np.array([15, 3, 3, 3, 3, 3])
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            [
+                np.array([0.66, 0.33]),
+                np.array([0.25, 0.25]),
+                np.array([0.25, 0.5]),
+                np.array([0.25, 0.75]),
+                np.array([0.5, 0.75]),
+                np.array([0.75, 0.75]),
+            ],
+            [m2 / 5, m1 / 80, m1 / 80, m1 / 80, m1 /80, m1 / 80],
+            code=code
+        )
+        ##print(resp.mathematica())
+        return resp
+    elif code == 'ex04':
+        ## USED ##
+        sigma = 0.3
+        angle = 10.
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        prop = np.array([15, 13, 11, 9, 7])
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            [
+                np.array([0.25, 0.25]),
+                np.array([0.25, 0.5]),
+                np.array([0.25, 0.75]),
+                np.array([0.5, 0.75]),
+                np.array([0.75, 0.75]),
+            ],
+            [m1 / 8, m1 / 16, m1 / 24, m1 / 32, m1 / 40],
+            code=code
+        )
+        ##print(resp.mathematica())
+        return resp
     elif code == 'lap1':
         return TruncatedLaplace2D(np.array([0.5, 0.5]), 0.1, code)
     elif code == 'lap2':
@@ -602,4 +687,4 @@ def dist_from_code(code):
             [dist1, dist2],
             code)
     else:
-        raise NotImplemented('Unknown distribution code [%s]' % code)
+        raise NotImplementedError('Unknown distribution code [%s]' % code)
