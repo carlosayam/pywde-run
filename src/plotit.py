@@ -204,9 +204,9 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
 @click.argument('wave_name')
 @click.argument('delta_j', type=int)
 @click.argument('target', type=click.Choice([SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF]))
-@click.argument('mode', type=click.Choice([SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD]))
+@click.argument('mode', type=click.Choice([SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD, SPWDE.TH_EMP_STD_ADJ]))
 @click.option('--k', type=int, default=1)
-@click.option('--j0', type=int, default=0)
+@click.option('--j0', default=None)
 @click.option('--contour', is_flag=True)
 def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode, **kwargs):
     """
@@ -216,27 +216,33 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
     k = kwargs['k']
     what = 'best_j' + ('.k_%d' % k)
     j0 = kwargs['j0']
-    what = what + ('.j0_%d' % j0)
-    what = wave_name + '-' + what
-    png_file = png_name(dist_code, num_obvs, sample_no, what)
     source = sample_name(dist_code, num_obvs, sample_no)
     data = read_data(source)
     assert data.shape[0] == num_obvs
-    # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
-    # wde.best_j(data)
+    if j0 is None:
+        spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
+        best_j = spwde.best_j(data, mode=target, stop_on_max=True)
+        j0 = best_j - delta_j
+        print('Using J_0 =', j0, 'with +%d' % delta_j)
+    else:
+        j0 = int(j0)
+        print('Params J_0 =', j0, 'with +%d' % delta_j)
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
+    png_file = png_name(dist_code, num_obvs, sample_no, what)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
     spwde.best_c(data, delta_j, target, th_mode=mode)
     # return # << !!!
+    pdf = spwde.best_c_found[0]
+    cc = spwde.best_c_found[1]
     if spwde.best_c_data:
         xy = np.array(spwde.best_c_data)
         import seaborn as sns
         import matplotlib.pyplot as plt
-        if mode == SPWDE.TH_ADJUSTED:
-            subtit = r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$"
-        elif mode == SPWDE.TH_CLASSIC:
-            subtit = r"$\left| \beta_{j,q,z} \right| \geq C$"
-        else: # mode == SPWDE.TH_EMP_STD
-            subtit = r"$\left| \beta_{j,q,z} \right| - 4 \sigma[\beta^{(i)}_{j,q,z}] \geq C$"
+        if pdf.subtitle:
+            subtit = pdf.subtitle
+        else:
+            subtit = ''
         title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$, %s" % (dist_code, wave_name, j0, delta_j, subtit))
         ax = sns.lineplot(xy[:,0], xy[:,1])
         ax.set_title(title)
@@ -244,8 +250,6 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
         ax.set(xlabel="$C$", ylabel=r"$HD_%d(C)$" % mode_ix, )
         ax.fill_between(xy[:,0], xy[:,1]-3*xy[:,2], xy[:,1]+3*xy[:,2], alpha=0.3)
         plt.show()
-    pdf = spwde.best_c_found[0]
-    cc = spwde.best_c_found[1]
     if kwargs['contour']:
         do_pdf_contour(pdf, 'test3-%s.png' % cc[0], dist)
     else:
@@ -258,11 +262,11 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
 @click.argument('sample_no', type=int)
 @click.argument('wave_name')
 @click.argument('delta_j', type=int)
-@click.argument('mode', type=click.Choice([SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]))
+@click.argument('target', type=click.Choice([SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]))
 @click.option('--k', type=int, default=1)
-@click.option('--j0', type=int, default=0)
+@click.option('--j0', default=None)
 @click.option('--contour', is_flag=True)
-def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwargs):
+def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, target, **kwargs):
     """
     Calculate best WDE using greedy optimisation
     """
@@ -270,16 +274,24 @@ def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwar
     k = kwargs['k']
     what = 'best_j' + ('.k_%d' % k)
     j0 = kwargs['j0']
-    what = what + ('.j0_%d' % j0)
-    what = wave_name + '-' + what
     png_file = png_name(dist_code, num_obvs, sample_no, what)
     source = sample_name(dist_code, num_obvs, sample_no)
     data = read_data(source)
     assert data.shape[0] == num_obvs
+    if j0 is None:
+        spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
+        best_j = spwde.best_j(data, mode=target, stop_on_max=True)
+        j0 = best_j - delta_j
+        print('Using J_0 =', j0, 'with +%d' % delta_j)
+    else:
+        j0 = int(j0)
+        print('Params J_0 =', j0, 'with +%d' % delta_j)
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
     # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
     # wde.best_j(data)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
-    spwde.best_greedy(data, delta_j, mode)
+    spwde.best_greedy(data, delta_j, j0, target)
     # return # << !!!
     if spwde.best_c_data:
         xy = np.array(spwde.best_c_data)
@@ -289,7 +301,7 @@ def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, mode, **kwar
                  r"$\left| \beta_{j,q,z} \right| \geq C \sqrt{j + 1}$") % (dist_code, wave_name, j0, delta_j)
         ax = sns.lineplot(xy[:,0], xy[:,1])
         ax.set_title(title)
-        mode_ix = 1 if mode == SPWDE.MODE_NORMED else 2
+        mode_ix = 1 if target == SPWDE.TARGET_NORMED else 2
         ax.set(xlabel="$C$", ylabel=r"$HD_%d(C)$" % mode_ix, )
         plt.show()
     pdf = spwde.best_c_found[0]
