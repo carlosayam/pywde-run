@@ -60,22 +60,27 @@ def batch_samples():
     Launch jobs to generate samples
     """
 
-    def gen_samples_walltime(num_obvs):
+    def gen_samples_walltime(job_data):
+        num_obvs = int(job_data[1][1])
         return num_obvs * 90.0 / 1000 + 30.0
 
     dists = ['ex01', 'ex02', 'ex03', 'ex04']
-    num_obvs = [250, 500, 1000, 1500, 2000, 3000, 4000]
-    tot_time = 0.0
-    jobs = []
-    for dist, nobs in itt.product(dists, num_obvs):
-        tot_time += gen_samples_walltime(nobs)
-        jobs.append(('gen-samples', (dist, str(nobs))))
-        if tot_time > 3600:
-            gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp02')
-            tot_time = 0.0
-            jobs = []
-    if len(jobs) > 0:
-        gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp02')
+    num_obvs_list = [250, 500, 1000, 1500, 2000, 3000, 4000]
+    plan_name_func = lambda n: 'gen-samples-%05d.pbs' % n
+    jobs = JobList(
+        job_name='gen-samples',
+        exp_dir='exp02',
+        headers=None,
+        time_func=gen_samples_walltime,
+        plan_name_func=plan_name_func,
+        fname_func=None,
+        job_max_secs=15*60
+    )
+    for dist, num_obvs in itt.product(dists, num_obvs_list):
+        job_data = ('gen-samples', (dist, str(num_obvs)))
+        jobs.append(job_data)
+    jobs.process()
+    print('TOTAL JOBS :', jobs.num_jobs)
 
 
 @main.command()
@@ -145,12 +150,14 @@ def batch_best_c(num_obvs):
         ('ex04', ['sym3', 'sym4', 'db4']),
     ]
     fname_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.tab' % (num_obvs, n)
+    plan_name_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.pbs' % (num_obvs, n)
     headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
     jobs = JobList(
         job_name='best-c',
         exp_dir='exp02',
         headers=headers,
         time_func=walltime,
+        plan_name_func=plan_name_func,
         fname_func=fname_func,
     )
     os.makedirs('RESP/exp02', exist_ok=True)
@@ -170,13 +177,15 @@ def batch_best_c(num_obvs):
     print('TOTAL JOBS :', jobs.num_jobs)
 
 class JobList(object):
-    def __init__(self, job_name, exp_dir, headers, time_func, fname_func):
+    def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_secs=3600*6):
         self._job_name = job_name
         self._exp_dir = exp_dir
         self._headers = headers
         self._time_func = time_func
         self._fname_func = fname_func
+        self._plan_name_func = plan_name_func
         self._jobs = []
+        self._job_max_secs = job_max_secs
         self._total_time = 0
         self._jobix = 0
 
@@ -186,7 +195,7 @@ class JobList(object):
 
     def append(self, job_data):
         exp_time = self._time_func(job_data)
-        if self._total_time + exp_time > 3600 * 6:
+        if self._total_time + exp_time > self._job_max_secs:
             self.process()
         self._jobs.append(job_data)
         self._total_time += exp_time
@@ -201,20 +210,25 @@ class JobList(object):
     def _gen_and_launch(self):
         os.makedirs('RESP/plans', exist_ok=True)
         tot_time = (60*15) * (int(self._total_time / (60*15))+1)
-        fname_result = self._fname_func(self._jobix)
-        fname = str(Path('RESP') / 'plans' / Path(fname_result).name.replace('.tab', '.pbs'))
-        with open(fname, 'wt') as fh:
+        plan_name = str(Path('RESP') / 'plans' / self._plan_name_func(self._jobix))
+        with open(plan_name, 'wt') as fh:
             fh.write(PLAN % {'exp_dir': self._exp_dir})
-            fh.write('rm -f "%s"\n' % fname_result)
-            fh.write('echo "%s" > %s\n' % (self._headers, fname_result))
+            if self._fname_func is not None:
+                fname_result = self._fname_func(self._jobix)
+                fh.write('rm -f "%s"\n' % fname_result)
+                if self._headers:
+                    fh.write('echo "%s" > %s\n' % (self._headers, fname_result))
+            else:
+                fname_result = None
             for job in self._jobs:
                 command, params = job
                 params = list(params)
-                params.append(fname_result)
+                if fname_result is not None:
+                    params.append(fname_result)
                 params = ' '.join(params)
                 line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
                 fh.write(line)
-        args, cwd = popen_args(fname, self._job_name.upper(), timedelta(seconds=tot_time))
+        args, cwd = popen_args(plan_name, self._job_name.upper(), timedelta(seconds=tot_time))
         print(' '.join(args))
         # subprocess.call(args)
 
