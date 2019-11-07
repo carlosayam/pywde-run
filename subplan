@@ -5,8 +5,10 @@ import subprocess
 import os
 import sys
 import itertools as itt
+from pathlib import Path
 from tempfile import mkstemp
 from datetime import timedelta
+from pywde.spwde import SPWDE
 
 import click
 
@@ -114,68 +116,107 @@ def batch_bestj():
 
 @main.command()
 @click.argument('num_obvs', type=int)
-def batch_bestc(num_obvs):
+def batch_best_c(num_obvs):
     """
     Launch jobs to process best-c
     """
 
-    def walltime(num):
-        "Estimated walltime in secs"
-        return 1.2 * num
+    _ETIMES = {
+        250: 94,
+        500: 328,
+        1000: 550,
+        1500: 1260,
+        2000: 1955,
+        3000: 3600,
+        4000: 18100,
+    }
 
-    # num_obvs = [100, 500, 1000, 1500, 2500, 3500, 5000]
+    def walltime(job_data):
+        "Estimated walltime in secs"
+        if job_data[0] == 'kde':
+            return 1200
+        return _ETIMES[num_obvs] * 1.1
+
+    # num_obvs = [250, 500, 1000, 1500, 2500, 3500, 5000]
     plans = [
         ('ex01', ['sym3', 'sym4', 'db4']),
         ('ex02', ['sym3', 'sym4', 'db4']),
         ('ex03', ['sym3', 'sym4', 'db4']),
         ('ex04', ['sym3', 'sym4', 'db4']),
     ]
-    tot_time = 0.0
-    resp_name = lambda n: 'RESP/exp02/results-%05d-%05d.tab' % (num_obvs, n)
-    jobs, resp_num, fname = [], 1, resp_name(1)
-    os.makedirs('RESP/exp02', exist_ok=True)
+    fname_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.tab' % (num_obvs, n)
     headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
+    jobs = JobList(
+        job_name='best-c',
+        exp_dir='exp02',
+        headers=headers,
+        time_func=walltime,
+        fname_func=fname_func,
+    )
+    os.makedirs('RESP/exp02', exist_ok=True)
+    modes = [SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF]
     for a_plan in plans:
         dist_code, wavelets = a_plan
-        if len(jobs) > 0:
-            gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
-            tot_time = 0.0
-            jobs = []
-            resp_num += 1
-            fname = resp_name(resp_num)
-        for wave_name, sample_no in itt.product(wavelets, range(100)):
-            tot_time += int(1.25 * walltime(num_obvs))
-            job_data = ('best-c', (dist_code, str(num_obvs), str(sample_no + 1), wave_name, fname))
+        # mini-batch kde
+        tot_blocks = int((0.0003 * num_obvs * num_obvs + 0.4687 * num_obvs - 50.486) / 900) + 1
+        kdes_per_block = int(100 / tot_blocks) + 1
+        for ix in range(tot_blocks):
+            job_data = ('kde', (dist_code, str(num_obvs), str(1 + ix * kdes_per_block), str(kdes_per_block)))
             jobs.append(job_data)
-            if tot_time > 3600*3:
-                gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
-                tot_time = 0.0
-                jobs = []
-                resp_num += 1
-                fname = resp_name(resp_num)
-    if len(jobs) > 0:
-        gen_and_launch(jobs, tot_time, job_name='best-c', exp_dir='exp02', headers=headers)
-    print('TOTAL JOBS :', resp_num)
+        for wave_name, sample_no, a_mode in itt.product(wavelets, range(100), modes):
+            job_data = ('best-c', (dist_code, str(num_obvs), str(sample_no + 1), wave_name, a_mode))
+            jobs.append(job_data)
+    jobs.process()
+    print('TOTAL JOBS :', jobs.num_jobs)
 
+class JobList(object):
+    def __init__(self, job_name, exp_dir, headers, time_func, fname_func):
+        self._job_name = job_name
+        self._exp_dir = exp_dir
+        self._headers = headers
+        self._time_func = time_func
+        self._fname_func = fname_func
+        self._jobs = []
+        self._total_time = 0
+        self._jobix = 0
 
+    @property
+    def num_jobs(self):
+        return self._jobix
 
-def gen_and_launch(jobs, tot_time, job_name='gen-samples', exp_dir='exp01', headers=None):
-    os.makedirs('RESP/plans', exist_ok=True)
-    ofd, fname = mkstemp(prefix='%s-' % job_name, suffix='.pbs', dir='RESP/plans', text=True)
-    tot_time = (60*15) * (int(tot_time / (60*15))+1)
-    with os.fdopen(ofd, 'wt') as fh:
-        fh.write(PLAN % {'exp_dir': exp_dir})
-        fh.write('rm -f "%s"\n' % jobs[0][1][-1])
-        if headers:
-            fh.write('%s\n' % headers)
-        for job in jobs:
-            command, params = job
-            params = ' '.join(params)
-            line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
-            fh.write(line)
-    args, cwd = popen_args(fname, job_name.upper(), timedelta(seconds=tot_time))
-    print(' '.join(args))
-    ## subprocess.call(args)
+    def append(self, job_data):
+        exp_time = self._time_func(job_data)
+        if self._total_time + exp_time > 3600 * 6:
+            self.process()
+        self._jobs.append(job_data)
+        self._total_time += exp_time
+
+    def process(self):
+        if len(self._jobs) > 0:
+            self._gen_and_launch()
+            self._jobs = []
+            self._total_time = 0
+            self._jobix += 1
+
+    def _gen_and_launch(self):
+        os.makedirs('RESP/plans', exist_ok=True)
+        tot_time = (60*15) * (int(self._total_time / (60*15))+1)
+        fname_result = self._fname_func(self._jobix)
+        fname = str(Path('RESP') / 'plans' / Path(fname_result).name.replace('.tab', '.pbs'))
+        with open(fname, 'wt') as fh:
+            fh.write(PLAN % {'exp_dir': self._exp_dir})
+            fh.write('rm -f "%s"\n' % fname_result)
+            fh.write('echo "%s" > %s\n' % (self._headers, fname_result))
+            for job in self._jobs:
+                command, params = job
+                params = list(params)
+                params.append(fname_result)
+                params = ' '.join(params)
+                line = 'python3 $SW_DIR/src/runit.py %s %s\n' % (command, params)
+                fh.write(line)
+        args, cwd = popen_args(fname, self._job_name.upper(), timedelta(seconds=tot_time))
+        print(' '.join(args))
+        # subprocess.call(args)
 
 
 if __name__ == '__main__':

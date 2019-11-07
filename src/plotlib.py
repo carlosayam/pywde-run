@@ -27,7 +27,7 @@ def calc_maxv(dist):
     return (zz / zz_sum).max()
 
 
-def plot_dist(fname, dist):
+def plot_dist(fname, dist, elev=None, azim=None):
     grid_n = 100
     xx, yy = grid_as_vector(grid_n)
     zz = dist.pdf((xx, yy))
@@ -35,14 +35,19 @@ def plot_dist(fname, dist):
     zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
     print('int =', zz_sum)
     max_v = (zz / zz_sum).max()
-    fig = plt.figure()
+    fig = plt.figure(figsize=(6,4))
     ax = fig.gca(projection='3d')
+    if elev is None:
+        elev = 30
+    if azim is None:
+        azim = -60
+    ax.view_init(elev, azim)
     ax.plot_surface(xx, yy, zz / zz_sum, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
-    ax.set_title(dist.code)
+    # ax.set_title(dist.code)
     ax.set_zlim(0, 1.1 * max_v)
-    plt.show()
     if fname is not None:
         plt.savefig(fname)
+    plt.show()
     plt.close()
     print('%s saved' % fname)
 

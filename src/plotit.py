@@ -166,6 +166,7 @@ def plot_wde(dist_code, num_obvs, sample_no, wave_name, **kwargs):
 @click.argument('mode', type=click.Choice([SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]))
 @click.option('--k', type=int, default=1)
 @click.option('--j0', type=int, default=0)
+@click.option('--fail-fast', is_flag=True, default=True)
 @click.option('--contour', is_flag=True)
 def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
     """
@@ -204,29 +205,27 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
 @click.argument('wave_name')
 @click.argument('delta_j', type=int)
 @click.argument('target', type=click.Choice([SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF]))
-@click.argument('mode', type=click.Choice([SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD, SPWDE.TH_EMP_STD_ADJ]))
+@click.argument('mode', type=click.Choice([SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD]))
 @click.option('--k', type=int, default=1)
-@click.option('--j0', default=None)
+@click.option('--excess-j', default=0)
 @click.option('--contour', is_flag=True)
 def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode, **kwargs):
     """
-    Calculates WDE for best threshold options
+    Calculates WDE for best threshold options.
+    J0 = Best J0 - delta_j
     """
     dist = dist_from_code(dist_code)
     k = kwargs['k']
     what = 'best_j' + ('.k_%d' % k)
-    j0 = kwargs['j0']
+    excess_j = kwargs['excess_j']
     source = sample_name(dist_code, num_obvs, sample_no)
     data = read_data(source)
     assert data.shape[0] == num_obvs
-    if j0 is None:
-        spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
-        best_j = spwde.best_j(data, mode=target, stop_on_max=True)
-        j0 = best_j - delta_j
-        print('Using J_0 =', j0, 'with +%d' % delta_j)
-    else:
-        j0 = int(j0)
-        print('Params J_0 =', j0, 'with +%d' % delta_j)
+    spwde = SPWDE(((wave_name, 0), (wave_name, 0)), k=1)
+    best_j = spwde.best_j(data, mode=target, stop_on_max=True)
+    j0 = best_j - delta_j
+    delta_j = delta_j + excess_j
+    print('Using J_0 =', j0, 'with +%d' % delta_j)
     what = what + ('.j0_%d' % j0)
     what = wave_name + '-' + what
     png_file = png_name(dist_code, num_obvs, sample_no, what)

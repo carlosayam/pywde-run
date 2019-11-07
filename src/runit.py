@@ -162,21 +162,16 @@ def bestj_task(dist_code, num_obvs, sample_no, wave_name, results):
             print(row)
             writer.writerow(row)
 
-
 @main.command()
 @click.argument('dist_code')
 @click.argument('num_obvs', type=int)
-@click.argument('sample_no', type=int)
-@click.argument('wave_name')
+@click.argument('first_sample', type=int)
+@click.argument('num_samples', type=int)
 @click.argument('results', type=click.Path(file_okay=True, dir_okay=False, writable=True))
-def best_c(dist_code, num_obvs, sample_no, wave_name, results):
-    "Run all stuff for 1 task"
-    dist = dist_from_code(dist_code)
-    source = sample_name(dist_code, num_obvs, sample_no)
-    data = read_data(source)
-    assert data.shape[0] == num_obvs
+def kde(dist_code, num_obvs, first_sample, num_samples, results):
+    "Run KDE for samples starting first_sample, up to num_samples"
 
-    def _kde():
+    def _kde(sample_no, data):
         t0 = datetime.now()
         kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
         elapsed = (datetime.now() - t0).total_seconds()
@@ -184,22 +179,52 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
         return (dist_code, num_obvs, sample_no, 'KDE', '', '', '', 0,
                 0, 0, num_obvs, 0.0, hd, elapsed)
 
-    def calc_bestj(mode):
+    dist = dist_from_code(dist_code)
+    with open(results, 'a') as fh:
+        writer = csv.writer(fh, delimiter='\t')
+        for sample_no in range(num_samples):
+            sample_no = first_sample + sample_no
+            if sample_no > 100:
+                break
+            source = sample_name(dist_code, num_obvs, sample_no)
+            data = read_data(source)
+            assert data.shape[0] == num_obvs
+            row = _kde(sample_no, data)
+            print(row)
+            writer.writerow(row)
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('mode', type=click.Choice([SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF]))
+@click.argument('results', type=click.Path(file_okay=True, dir_okay=False, writable=True))
+def best_c(dist_code, num_obvs, sample_no, wave_name, mode, results):
+    "Run all stuff for 1 task"
+    dist = dist_from_code(dist_code)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+
+    def calc_bestj(a_mode):
         t0 = datetime.now()
         spwde = SPWDE(((wave_name, 0),(wave_name, 0)) , k=1)
-        best_j = spwde.best_j(data, mode=mode, stop_on_max=True)
+        best_j = spwde.best_j(data, mode=a_mode, stop_on_max=True)
         elapsed = (datetime.now() - t0).total_seconds()
         return best_j, elapsed
 
 
     def _bestc(best_j_dict):
-        for mode, th_mode, delta_j in itt.product(
-                (SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF),
-                (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD, SPWDE.TH_EMP_STD_ADJ),
-                (1, 2, 3)
+        for th_mode, delta_j, excess_j in itt.product(
+                (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD),
+                (1, 2, 3),
+                (0, 1)
         ):
             best_j, elapsed0 = best_j_dict[mode]
             the_j = best_j - delta_j
+            delta_j = delta_j + excess_j
             t0 = datetime.now()
             spwde = SPWDE(((wave_name, the_j), (wave_name, the_j)), k=1)
             spwde.best_c(data, delta_j, mode, th_mode)
@@ -210,14 +235,9 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, results):
             yield (dist_code, num_obvs, sample_no, 'WDE', wave_name, mode, th_mode, best_j,
                    the_j, delta_j, num_coeffs, b_hat_j, hd, elapsed0 + elapsed)
 
-
-
     with open(results, 'a') as fh:
         writer = csv.writer(fh, delimiter='\t')
-        row = list(_kde())
-        print(row)
-        writer.writerow(row)
-        best_j_dict = {mode: calc_bestj(mode) for mode in [SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]}
+        best_j_dict = {mode: calc_bestj(mode)}
         for row in _bestc(best_j_dict):
             print(row)
             writer.writerow(row)
@@ -238,6 +258,13 @@ def exp01_compare(directory):
     from exp01 import do_compare_algos
     do_compare_algos(directory)
 
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp02_plots(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp02 import do_plot_exp02
+    do_plot_exp02(directory)
 
 
 @main.command()
