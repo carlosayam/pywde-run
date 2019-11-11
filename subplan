@@ -150,7 +150,7 @@ def batch_best_c(num_obvs):
         ('ex04', ['sym3', 'sym4', 'db4']),
     ]
     fname_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.tab' % (num_obvs, n)
-    plan_name_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.pbs' % (num_obvs, n)
+    plan_name_func = lambda n: 'best-c-%05d-%05d.pbs' % (num_obvs, n)
     headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
     jobs = JobList(
         job_name='best-c',
