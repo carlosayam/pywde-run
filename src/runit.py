@@ -217,12 +217,14 @@ def best_c(dist_code, num_obvs, sample_no, wave_name, mode, results):
 
 
     def _bestc(best_j_dict):
+        best_j, elapsed0 = best_j_dict[mode]
+        yield (dist_code, num_obvs, sample_no, 'best_j_part', wave_name, mode, '', best_j,
+               0, 0, 0, 0, 0, elapsed0)
         for th_mode, delta_j, excess_j in itt.product(
                 (SPWDE.TH_CLASSIC, SPWDE.TH_ADJUSTED, SPWDE.TH_EMP_STD),
                 (1, 2, 3),
                 (0, 1)
         ):
-            best_j, elapsed0 = best_j_dict[mode]
             the_j = best_j - delta_j
             delta_j = delta_j + excess_j
             t0 = datetime.now()
@@ -265,6 +267,16 @@ def exp02_plots(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
     from exp02 import do_plot_exp02
     do_plot_exp02(directory)
+
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp02_repl(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp02 import exp02_repl
+    exp02_repl(directory)
+
+
 
 
 @main.command()
