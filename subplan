@@ -126,21 +126,36 @@ def batch_best_c(num_obvs):
     Launch jobs to process best-c
     """
 
+    # df[df.algorithm == 'WDE'].groupby(['num_obvs']).agg({'running_time':'describe'}); took Q3 (75% perc.)
+    # execution time _including_ the common best-j calculation
     _ETIMES = {
-        250: 94,
-        500: 328,
-        1000: 550,
-        1500: 1260,
-        2000: 1955,
-        3000: 3600,
-        4000: 18100,
+        250: 9,
+        500: 45,
+        1000: 117,
+        1500: 173,
+        # 2000: 535,
+        # 3000: 830,
+        # 4000: 1645,
+        # 5000: 3000 # estimated
+    }
+    # execution time for best-j - small value, be conservative (!)
+    _BESTJ_TIME = {
+        250: 2.5,
+        500: 14,
+        1000: 50,
+        1500: 86,
+        # 2000: 535,
+        # 3000: 830,
+        # 4000: 1645,
+        # 5000: 3000  # estimated
     }
 
     def walltime(job_data):
         "Estimated walltime in secs"
         if job_data[0] == 'kde':
             return 1200
-        return _ETIMES[num_obvs] * 1.1
+        NUM_MINIJOBS = 18
+        return ((_ETIMES[num_obvs] - _BESTJ_TIME[num_obvs])*NUM_MINIJOBS + _BESTJ_TIME[num_obvs])* 1.1
 
     # num_obvs = [250, 500, 1000, 1500, 2500, 3500, 5000]
     plans = [
