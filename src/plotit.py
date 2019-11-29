@@ -246,7 +246,7 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
         ax = sns.lineplot(xy[:,0], xy[:,1])
         ax.set_title(title)
         mode_ix = 1 if target == SPWDE.TARGET_NORMED else 2
-        ax.set(xlabel="$C$", ylabel=r"$HD_%d(C)$" % mode_ix, )
+        ax.set(xlabel="$C$", ylabel=r"$\hat{B}_%d(C)$" % mode_ix, )
         ax.fill_between(xy[:,0], xy[:,1]-3*xy[:,2], xy[:,1]+3*xy[:,2], alpha=0.3)
         plt.show()
     if kwargs['contour']:

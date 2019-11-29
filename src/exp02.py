@@ -83,8 +83,8 @@ def do_plot_exp02(directory):
     plt, sns = _init_()
     directory = Path(directory)
     df = _load_data(directory)
-    print(sorted(df.algorithm.unique()))
-    nums = [250, 500, 1000, 1500, 2000] ## 3000, 4000
+    print(sorted(set([(str(row[0]), str(row[1])) for _, row in df[['dist_code', 'wave_name']].iterrows()])))
+    nums = [250, 500, 1000, 1500, 2000, 3000, 4000]
     plans = [
         ('ex01', ['sym3', 'sym4', 'db4']),
         ('ex02', ['sym3', 'sym4', 'db4']),
@@ -101,6 +101,7 @@ def do_plot_exp02(directory):
         figname = 'plot-%s-true.png' % (dist_code,)
         full_figname = str(directory / 'plots' / figname)
         fig.savefig(full_figname)
+        #fig.close()
         plt.close(fig)
         print('>', figname)
         alt_tit = '%s, true' % (dist_code,)
@@ -140,35 +141,51 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df):
     fig, axs = plt.subplots(3, 1, sharey=True, sharex=True, figsize=(10, 9))
     # wave_name -> mode -> th_mode -> delta_j
     df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)]
+    max_hd = np.percentile(df1.hd, 95)
     kde_hd = {}
-    for ix, row in df1.iterrows():
-        if row.algorithm == 'KDE':
-            kde_hd[row.sample_no] = row.hd
+    for ix, row in df[df.algorithm == 'KDE'].iterrows():
+        kde_hd[row.sample_no] = row.hd
     _HD = {'normed': '$HD_1$', 'diff': '$HD_2$'}
     _TH = {SPWDE.TH_CLASSIC: '$C$',
            SPWDE.TH_ADJUSTED: '$C\sqrt{\Delta j}$',
            SPWDE.TH_EMP_STD: '$C\sigma^B$'}
-    _Y = '$HD_i - HD_{KDE}$'
+    _Y = '$HD_i$'
     _DELTA_J = '$\Delta J$'
     for px, wave_name in enumerate(waves):
         title = wave_name
-        df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs) & (df.wave_name == wave_name)]
-        series =  {_Y: [], 'modes':[], _DELTA_J:[]}
-        for ix, row in df1.iterrows():
-            if row.algorithm == 'KDE':
-                continue
-            hd_i = kde_hd[row.sample_no]
-            series[_Y].append(hd_i - row.hd)
-            series['modes'].append('%s\n%s' % (_HD[row.opt_target], _TH[row.treshold_mode]))
-            series[_DELTA_J].append(row.delta_j)
-        df1 = pd.DataFrame(series)
-        ## print(df1.shape)
+        # print(list(df))
+        # print(df.dist_code.unique())
+        # print(df.num_obvs.unique())
+        # print(df.wave_name.unique())
+        # print(dist_code, num_obvs, wave_name)
+        df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs) & (df.wave_name == wave_name) &
+                 (df.best_j == df.start_j + df.delta_j)].copy()
+        df1.reset_index()
+        func = lambda row: '%s\n%s' % (_HD[row.opt_target], _TH[row.treshold_mode])
+        #print(list(df1))
+        # print(df1.shape)
+        df1['mode'] = df1.apply(func, axis=1)
+        # copy one
+        df2 = df1[df1.delta_j == 1].copy()
+        df2['hd'] = df2.apply(lambda row: kde_hd[row.sample_no], axis=1)
+        df2['delta_j'] = 'kde'
+        df2.reset_index()
+
+        df1 = pd.concat([df1, df2])
         # axs[px].scatter(df1.modes, df1.hd, alpha=0.2)
         axs[px].set_title(title)
         ##axs[px].set_legend(loc='bottom right')
-        sns.boxplot(x='modes', y=_Y, hue=_DELTA_J, data=df1, ax=axs[px])
+        # import code
+        # code.interact('**', local=locals())
+        # print('delta_j', df1.delta_j.unique())
+
+        sns.boxplot(x='mode', y='hd', hue='delta_j', data=df1, ax=axs[px],
+                    hue_order=['kde', 1, 2, 3])
         handles, labels = axs[px].get_legend_handles_labels()
         axs[px].legend(handles, labels, bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., title=_DELTA_J)
+        # ylim = axs[px].get_ylim()
+        # ylim = (0, ylim[1])
+        axs[px].set(ylim=(0, max_hd))
         #ax1.legend_.set_title('Algorithm')
     xmin, xmax = axs[len(waves) - 1].get_xbound()
     for px in range(len(waves)):
@@ -191,6 +208,9 @@ def _plot_true(plt, dist_code):
     max_v = (zz / zz_sum).max()
     fig = plt.figure(figsize=(4.5, 4.5))
     ax = fig.gca(projection='3d')
+    elev = 15
+    azim = -60
+    ax.view_init(elev, azim)
     ax.plot_surface(xx, yy, zz / zz_sum, edgecolors='k', linewidth=0.5, cmap='BuGn')
     ax.set_title(_EX[dist.code])
     ax.set_zlim(0, 1.1 * max_v)
@@ -214,16 +234,26 @@ def _init_(is_agg=True):
 
 
 def _load_data(directory):
-    df = None
-    headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
-    headers = headers.split("\t")
+    df, numf = None, 0
     for fname in directory.glob('*.tab'):
-        sa = pd.read_csv(fname, delimiter='\t', header=None, names=headers)
+        sa = pd.read_csv(fname, delimiter='\t')
+        numf += 1
         if df is None:
             df = sa
         else:
             df = pd.concat((df, sa), sort=False)
+    print('Read %d files' % numf)
     return df
+
+
+def exp02_repl(directory):
+    df = _load_data(Path(directory))
+    plt, sns = _init_(is_agg=False)
+    from code import interact
+    import pandas as pd
+    import numpy as np
+    interact('** df, plt, sns, pd, np', local=locals())
+
 
 
 _HTML_HEAD = """<!DOCTYPE html>

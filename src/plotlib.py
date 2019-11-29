@@ -35,10 +35,10 @@ def plot_dist(fname, dist, elev=None, azim=None):
     zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
     print('int =', zz_sum)
     max_v = (zz / zz_sum).max()
-    fig = plt.figure(figsize=(6,4))
+    fig = plt.figure(figsize=(12,9))
     ax = fig.gca(projection='3d')
     if elev is None:
-        elev = 30
+        elev = 15
     if azim is None:
         azim = -60
     ax.view_init(elev, azim)
@@ -106,8 +106,11 @@ def do_plot_pdf(pdf, fname, dist, interact=None):
     pp = pp.T.reshape(-1, 2)
     zz = pdf(pp) / corr_factor
     zz = zz.reshape((grid_n, grid_n)).T
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12,9))
     ax = fig.gca(projection='3d')
+    elev = 15
+    azim = -60
+    ax.view_init(elev, azim)
     ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
     ax.set_zlim(0, zlim)
     ax.set_title(pdf.name + ('\nHD = %g' % hd), wrap=True)
@@ -239,8 +242,11 @@ def do_plot_kde(kde, fname, dist, zlim):
 
     ##zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12,9))
     ax = fig.gca(projection='3d')
+    elev = 15
+    azim = -60
+    ax.view_init(elev, azim)
     ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
     ax.set_title(('KDE bw=%s' % str(kde.bw)) + ('\nHD = %g' % hd))
     ax.set_zlim(0, zlim)
