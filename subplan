@@ -121,7 +121,9 @@ def batch_bestj():
 
 @main.command()
 @click.argument('num_obvs', type=int)
-def batch_best_c(num_obvs):
+@click.option('--dist-code', type=click.Choice(['ex01', 'ex02', 'ex03', 'ex04']))
+@click.option('--wall-hours', type=int, default='')
+def batch_best_c(num_obvs, **kwargs):
     """
     Launch jobs to process best-c
     """
@@ -133,10 +135,11 @@ def batch_best_c(num_obvs):
         500: 45,
         1000: 117,
         1500: 173,
-        # 2000: 535,
-        # 3000: 830,
-        # 4000: 1645,
-        # 5000: 3000 # estimated
+        2000: 282,
+        3000: 266,
+        4000: 815,
+        6000: 1600,
+        8000: 2800,
     }
     # execution time for best-j - small value, be conservative (!)
     _BESTJ_TIME = {
@@ -144,10 +147,11 @@ def batch_best_c(num_obvs):
         500: 14,
         1000: 50,
         1500: 86,
-        # 2000: 535,
-        # 3000: 830,
-        # 4000: 1645,
-        # 5000: 3000  # estimated
+        2000: 135,
+        3000: 250,
+        4000: 450,
+        6000: 900,
+        8000: 1600
     }
 
     def walltime(job_data):
@@ -164,6 +168,8 @@ def batch_best_c(num_obvs):
         ('ex03', ['sym3', 'sym4', 'db4']),
         ('ex04', ['sym3', 'sym4', 'db4']),
     ]
+    a_dist_code = kwargs['dist_code']
+    wall_hours = kwargs['wall_hours']
     fname_func = lambda n: 'RESP/exp02/best-c-%05d-%05d.tab' % (num_obvs, n)
     plan_name_func = lambda n: 'best-c-%05d-%05d.pbs' % (num_obvs, n)
     headers = """dist_code\tnum_obvs\tsample_no\talgorithm\twave_name\topt_target\ttreshold_mode\tbest_j\tstart_j\tdelta_j\tnum_coeffs\tb_hat_j\thd\trunning_time"""
@@ -174,11 +180,15 @@ def batch_best_c(num_obvs):
         time_func=walltime,
         plan_name_func=plan_name_func,
         fname_func=fname_func,
+        job_max_hours=wall_hours
     )
     os.makedirs('RESP/exp02', exist_ok=True)
     modes = [SPWDE.TARGET_NORMED, SPWDE.TARGET_DIFF]
     for a_plan in plans:
         dist_code, wavelets = a_plan
+        if a_dist_code is not None:
+            if dist_code != a_dist_code:
+                continue
         # mini-batch kde
         tot_blocks = int((0.0003 * num_obvs * num_obvs + 0.4687 * num_obvs - 50.486) / 900) + 1
         kdes_per_block = int(100 / tot_blocks) + 1
@@ -192,7 +202,7 @@ def batch_best_c(num_obvs):
     print('TOTAL JOBS :', jobs.num_jobs)
 
 class JobList(object):
-    def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_secs=3600*6):
+    def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_hours=6):
         self._job_name = job_name
         self._exp_dir = exp_dir
         self._headers = headers
@@ -200,7 +210,7 @@ class JobList(object):
         self._fname_func = fname_func
         self._plan_name_func = plan_name_func
         self._jobs = []
-        self._job_max_secs = job_max_secs
+        self._job_max_secs = 3600 * job_max_hours
         self._total_time = 0
         self._jobix = 0
 
