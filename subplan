@@ -135,11 +135,11 @@ def batch_best_c(num_obvs, **kwargs):
         500: 45,
         1000: 117,
         1500: 173,
-        2000: 282,
-        3000: 266,
+        2000: 390,
+        3000: 950,
         4000: 815,
         6000: 1600,
-        8000: 2800,
+        8000: 2900,
     }
     # execution time for best-j - small value, be conservative (!)
     _BESTJ_TIME = {
