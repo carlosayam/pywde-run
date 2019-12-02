@@ -159,7 +159,7 @@ def batch_best_c(num_obvs, **kwargs):
         if job_data[0] == 'kde':
             return 1200
         NUM_MINIJOBS = 18
-        return ((_ETIMES[num_obvs] - _BESTJ_TIME[num_obvs])*NUM_MINIJOBS + _BESTJ_TIME[num_obvs])* 1.1
+        return ((_ETIMES[num_obvs] - _BESTJ_TIME[num_obvs])*NUM_MINIJOBS + _BESTJ_TIME[num_obvs])* 1.2
 
     # num_obvs = [250, 500, 1000, 1500, 2500, 3500, 5000]
     plans = [
