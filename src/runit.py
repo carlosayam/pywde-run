@@ -256,7 +256,7 @@ def exp01_plots(directory):
 @main.command()
 @click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
 def exp01_compare(directory):
-    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    "Reads all *.tab files in [DIRECTORY] and produces J - J^* plots"
     from exp01 import do_compare_algos
     do_compare_algos(directory)
 

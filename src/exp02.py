@@ -84,7 +84,7 @@ def do_plot_exp02(directory):
     directory = Path(directory)
     df = _load_data(directory)
     print(sorted(set([(str(row[0]), str(row[1])) for _, row in df[['dist_code', 'wave_name']].iterrows()])))
-    nums = [250, 500, 1000, 1500, 2000, 3000, 4000]
+    nums = [250, 500, 1000, 1500, 2000, 3000, 4000, 6000, 8000]
     plans = [
         ('ex01', ['sym3', 'sym4', 'db4']),
         ('ex02', ['sym3', 'sym4', 'db4']),
@@ -111,8 +111,8 @@ def do_plot_exp02(directory):
         col = 1
         for num_obvs in nums:
             ##lines.append('<h2>N = %d</h2>' % (num_obvs,))
-            fig = _plot_fig(plt, sns, dist_code, num_obvs, wavelets, df)
-            figname = 'plot-%s-%d.png' % (dist_code, num_obvs)
+            fig = _plot_fig(plt, sns, dist_code, num_obvs, wavelets, df, excess=0)
+            figname = 'plot-%s-%d-D0.png' % (dist_code, num_obvs)
             full_figname = str(directory / 'plots' / figname)
             fig.savefig(full_figname)
             plt.close(fig)
@@ -127,6 +127,28 @@ def do_plot_exp02(directory):
             col = (col + 1) % 2
         if col == 1:
             lines.append('</div>\n')
+
+        lines.append('\n<hr/>\n')
+        col = 0
+        for num_obvs in nums:
+            ##lines.append('<h2>N = %d</h2>' % (num_obvs,))
+            fig = _plot_fig(plt, sns, dist_code, num_obvs, wavelets, df, excess=1)
+            figname = 'plot-%s-%d-D1.png' % (dist_code, num_obvs)
+            full_figname = str(directory / 'plots' / figname)
+            fig.savefig(full_figname)
+            plt.close(fig)
+            print('>', figname)
+            alt_tit = '%s, %d' % (dist_code, num_obvs)
+            line = '<img src="%s" alt="%s" style="width:45%%"/>\n' % (figname, alt_tit)
+            if col == 0:
+                lines.append('<div>')
+            lines.append(line)
+            if col == 1:
+                lines.append('</div>\n')
+            col = (col + 1) % 2
+        if col == 1:
+            lines.append('</div>\n')
+
         # lines.append('</div>\n')
         if planx < 3:
             lines.append('<footer />\n')
@@ -137,7 +159,7 @@ def do_plot_exp02(directory):
 
 import matplotlib.lines as mlines
 
-def _plot_fig(plt, sns, dist_code, num_obvs, waves, df):
+def _plot_fig(plt, sns, dist_code, num_obvs, waves, df, excess=0):
     fig, axs = plt.subplots(3, 1, sharey=True, sharex=True, figsize=(10, 9))
     # wave_name -> mode -> th_mode -> delta_j
     df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)]
@@ -159,14 +181,18 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df):
         # print(df.wave_name.unique())
         # print(dist_code, num_obvs, wave_name)
         df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs) & (df.wave_name == wave_name) &
-                 (df.best_j == df.start_j + df.delta_j)].copy()
+                 (df.best_j + excess == df.start_j + df.delta_j)].copy()
+        print(df1.shape, end='; ')
+        if df1.shape[0] == 0:
+            print(dist_code, num_obvs, wave_name, excess)
+            continue
         df1.reset_index()
         func = lambda row: '%s\n%s' % (_HD[row.opt_target], _TH[row.treshold_mode])
         #print(list(df1))
         # print(df1.shape)
         df1['mode'] = df1.apply(func, axis=1)
         # copy one
-        df2 = df1[df1.delta_j == 1].copy()
+        df2 = df1[df1.delta_j == df1.delta_j.min()].copy()
         df2['hd'] = df2.apply(lambda row: kde_hd[row.sample_no], axis=1)
         df2['delta_j'] = 'kde'
         df2.reset_index()
