@@ -28,7 +28,7 @@ def calc_maxv(dist):
 
 
 def plot_dist(fname, dist, elev=None, azim=None):
-    grid_n = 100
+    grid_n = 256
     xx, yy = grid_as_vector(grid_n)
     zz = dist.pdf((xx, yy))
     print('sum=', zz.mean())

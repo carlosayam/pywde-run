@@ -1,0 +1,65 @@
+\begin{table}[ht!]\label{tab:<<DensityCode>>}
+	\caption[(Approximated) Hellinger distance comparison of non-linear estimators vs. KDE estimator for <<DensityName>>]
+	{(Approximated) Mean Squared Hellinger Distance (MSHD) for the various non linear estimator algorithms using the
+	<<WaveName>> wavelet for the density <<DensityName>> (Figure \ref{fig:truedenshardt} <<FigureLetter>>).
+	See text for column descriptions.}
+	\fontsize{7}{10}\selectfont
+	\centering
+	\begin{minipage}[t]{0.95\textwidth}
+		\centering
+		\begin{tabular}{|r|r|r|r|r|r|r|r|r|r|r|r|r|}
+			\hline
+			\multirow{2}{*}{\textbf{n}} & \multirow{2}{*}{${}_p\widehat{\mathcal{B}}_J$} & \multirow{2}{*}{$\Delta J$} & \multicolumn{3}{c|}{\textbf{$\lambda$}} & \multicolumn{3}{c|}{\textbf{$\lambda\,\sqrt{\Delta J}$}} & \multicolumn{3}{c|}{\textbf{$\lambda\,\sigma^B$}} & \multirow{2}{*}{KDE} \\
+			\cline{4-12}
+			& & & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ & \\
+			\hline
+			<<#Items>>
+			%% <<LinNum>>
+			<<#FirstNum>>
+			\multirow{6}{*}{<<Num>>} &
+			<</FirstNum>>
+			<<^FirstNum>>
+			&
+			<</FirstNum>>
+			<<#FirstHD>>
+			\multirow{3}{*}{<<HD>>} &
+			<</FirstHD>>
+			<<^FirstHD>>
+			&
+			<</FirstHD>>
+			<<JLevel>> &
+			{\tiny <<TH1Q1>>} &
+			<<#TH1Ok>>
+			\textbf{<<TH1Avg>>} &
+			<</TH1Ok>>
+			<<^TH1Ok>>
+			<<TH1Avg>> &
+			<</TH1Ok>>
+			{\tiny <<TH1Q3>>} &
+			{\tiny <<TH2Q1>>} &
+			<<#TH2Ok>>
+			\textbf{<<TH2Avg>>} &
+			<</TH2Ok>>
+			<<^TH2Ok>>
+			<<TH2Avg>> &
+			<</TH2Ok>>
+			{\tiny <<TH2Q3>>} &
+			{\tiny <<TH3Q1>>} &
+			<<#TH3Ok>>
+			\textbf{<<TH3Avg>>} &
+			<</TH3Ok>>
+			<<^TH3Ok>>
+			<<TH3Avg>> &
+			<</TH3Ok>>
+			{\tiny <<TH3Q3>>} &
+			<<#FirstNum>>
+			\multirow{6}{*}{<<KDE>>} \\
+			<</FirstNum>>
+			<<^FirstNum>>
+			\\
+			<</FirstNum>>
+			<<Border>>
+			<</Items>>
+		\end{tabular}
+	\end{minipage}
+\end{table}

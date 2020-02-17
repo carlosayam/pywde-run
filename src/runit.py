@@ -271,6 +271,14 @@ def exp02_plots(directory):
 
 @main.command()
 @click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp02_tex_table(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp02 import do_tex_table_exp02
+    do_tex_table_exp02(directory)
+
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
 def exp02_repl(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
     from exp02 import exp02_repl

@@ -1,3 +1,4 @@
 -e ../pywde
 click
 seaborn
+pystache

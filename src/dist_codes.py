@@ -686,5 +686,93 @@ def dist_from_code(code):
             ws,
             [dist1, dist2],
             code)
+    elif code == 'tpx1':
+        # 10 mins to generate samples
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = [10, 10]
+        mus = [np.array([0.35, 0.35]), np.array([0.65, 0.65])]
+        covs = [m2/3, m2/3]
+        nn = 4
+        for ix in range(nn):
+            px = 0.3 + ix * 0.4/nn
+            py = 0.3 + ix * 0.4/nn
+            prop.append(1)
+            mus.append(np.array([px + 0.2/nn,py + 0.2/nn]))
+            covs.append(m1/150)
+        prop = np.array(prop)
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            mus,
+            covs,
+            code=code
+        )
+        return resp
+    elif code == 'tpx2':
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = []
+        mus = []
+        covs = []
+        nn = 6
+        for ix in range(nn):
+            px = 0.2 + ix * 0.7/nn
+            py = 0.2 + ix * 0.7/nn
+            prop.append(1 / (nn*nn))
+            mus.append(np.array([px + 0.2/nn,py + 0.2/nn]))
+            if ix % 2 == 0:
+                covs.append(m1 / (50 + ix * 10))
+            else:
+                covs.append(m2 / (50 + ix * 10))
+        prop = np.array(prop)
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            mus,
+            covs,
+            code=code
+        )
+        return resp
+    elif code == 'tpx3':
+        sigma = 0.3
+        angle = 10.
+        theta = (angle / 180.) * np.pi
+        rot = np.array([[np.cos(theta), -np.sin(theta)],
+                        [np.sin(theta), np.cos(theta)]])
+        m1 = np.array([[sigma / 6, 0], [0, sigma / 8]])
+        m2 = np.dot(rot, np.dot(m1, rot.T))
+        prop = [2]
+        mus = [np.array([0.5, 0.5])]
+        covs = [m1 / 2]
+        nn = 4
+        for ix in range(nn):
+            px = 0.2 + ix * 0.7 / nn
+            py = 0.2 + ix * 0.7 / nn
+            prop.append(0.5)
+            mus.append(np.array([px + 0.35 / nn, py + 0.35 / nn]))
+            if ix % 2 == 0:
+                covs.append(m1 / (100 + ix * 10))
+            else:
+                covs.append(m2 / (100 + ix * 10))
+        prop = np.array(prop)
+        prop = prop / prop.sum()
+        resp = TruncatedMultiNormalD(
+            prop.tolist(),
+            mus,
+            covs,
+            code=code
+        )
+        return resp
     else:
         raise NotImplementedError('Unknown distribution code [%s]' % code)

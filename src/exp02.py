@@ -76,6 +76,92 @@ def do_compare_algos(directory):
         fh.writelines(lines)
     print('> plots.html')
 
+def do_tex_table_exp02(directory):
+    import pystache as ps
+    with open('src/ch4.tex', 'rt') as fh:
+        tpl = ps.parse("\n".join(fh.readlines()), delimiters=('<<','>>'))
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    directory = Path(directory)
+    df = _load_data(directory)
+    print('>>', list(df))
+    nums = [250, 500, 1000, 1500, 2000, 3000, 4000, 6000]
+    dist_codes = [('ex01', '(a)', 'db4'), ('ex02', '(b)', 'db4'), ('ex03', '(c)', 'sym3'), ('ex04', '(d)', 'sym3')]
+    os.makedirs(str(directory / 'plots2'), exist_ok=True)
+    _HD = [('normed', '${}_1\widehat{\mathcal{B}}_J$'), ('diff', '${}_2\widehat{\mathcal{B}}_J$')]
+    _TH = [
+        (SPWDE.TH_CLASSIC, 'TH1'),
+        (SPWDE.TH_ADJUSTED, 'TH2'),
+        (SPWDE.TH_EMP_STD, 'TH3')
+    ]
+    _DENSITY_NAMES = {
+        'ex01': 'Kurtotic Mixture 1',
+        'ex02': 'Mixture 2',
+        'ex03': '2D Comb 1 (claw)',
+        'ex04': '2D Smooth comb'
+    }
+    _WAVE_NAMES = {
+        'db4': 'Daubechie 4',
+        'sym3': 'Symlet 3'
+    }
+    with open(str(directory / 'plots2' / 'ch4-th-table.tex'), 'wt') as fh:
+        fh.write('%% auto generated %%\n')
+        for dist_code, fig_letter, wave_name in dist_codes:
+            ctx = {
+                'DensityName': _DENSITY_NAMES[dist_code],
+                'DensityCode': dist_code,
+                'FigureLetter': fig_letter,
+                'WaveName': _WAVE_NAMES[wave_name]
+            }
+            fh.write('%% dist_code = %s\n' % dist_code)
+            items = []
+            linnum = 0
+            for idx_n, num_obvs in enumerate(nums):
+                first_num = True
+                df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)
+                         & (df.algorithm == 'KDE')].copy()
+                kde_q1, kde_hd, kde_q3 = df1.hd.quantile([0.25, 0.50, 0.75])
+                ## kde_hd = df1.hd.mean()
+                kde_hd = '%.4f' % kde_hd
+                for idx_p, hd_desc in enumerate(_HD):
+                    first_hd = True
+                    for j_level in [1,2,3]:
+                        item = {'Num': num_obvs, 'HD': hd_desc[1], 'JLevel': j_level, 'KDE': kde_hd}
+                        for th_desc in _TH:
+                            th_algo, th_var = th_desc
+                            df1 = df[ (df.dist_code == dist_code) & (df.num_obvs == num_obvs)
+                                      & (df.wave_name == wave_name) & (df.delta_j == j_level)
+                                      & (df.best_j == df.start_j + df.delta_j) & (df.algorithm == 'WDE')
+                                      & (df.opt_target == hd_desc[0]) & (df.treshold_mode == th_algo)].copy()
+                            q1, avg, q3 = df1.hd.quantile([0.25, 0.50, 0.75])
+                            ## avg = df1.hd.mean()
+                            q1 = '%.4f' % q1
+                            q3 = '%.4f' % q3
+                            avg = '%.4f' % avg
+                            item['%sQ1' % th_var] = q1
+                            item['%sOk' % th_var] = avg <= kde_hd
+                            item['%sAvg' % th_var] = avg
+                            item['%sQ3' % th_var] = q3
+                        item['FirstNum'] = first_num
+                        item['FirstHD'] = first_hd
+                        if linnum % 6 == 5:
+                            item['Border'] = '\hline'
+                        elif linnum % 3 == 2:
+                            item['Border'] = '\cline{2-12}'
+                        else:
+                            item['Border'] = '\cline{3-12}'
+                        item['LinNum'] = linnum
+                        first_num = False
+                        first_hd = False
+                        linnum += 1
+                        print(item)
+                        items.append(item)
+            ctx['Items'] = items
+            for line in ps.Renderer().render(tpl, **ctx).splitlines():
+                line = line.rstrip()
+                if line:
+                    fh.write(line)
+                    fh.write('\n')
+
 
 def do_plot_exp02(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
@@ -91,7 +177,7 @@ def do_plot_exp02(directory):
         ('ex03', ['sym3', 'sym4', 'db4']),
         ('ex04', ['sym3', 'sym4', 'db4']),
     ]
-    os.makedirs(str(directory / 'plots'), exist_ok=True)
+    os.makedirs(str(directory / 'plots2'), exist_ok=True)
     lines = []
     lines.append(_HTML_HEAD)
     for planx, a_plan in enumerate(plans):
@@ -99,8 +185,8 @@ def do_plot_exp02(directory):
         lines.append('<h1>%s</h1>' % (_EX[dist_code],))
         fig = _plot_true(plt, dist_code)
         figname = 'plot-%s-true.png' % (dist_code,)
-        full_figname = str(directory / 'plots' / figname)
-        fig.savefig(full_figname)
+        full_figname = str(directory / 'plots2' / figname)
+        fig.savefig(full_figname, dpi=300)
         #fig.close()
         plt.close(fig)
         print('>', figname)
@@ -113,8 +199,8 @@ def do_plot_exp02(directory):
             ##lines.append('<h2>N = %d</h2>' % (num_obvs,))
             fig = _plot_fig(plt, sns, dist_code, num_obvs, wavelets, df, excess=0)
             figname = 'plot-%s-%d-D0.png' % (dist_code, num_obvs)
-            full_figname = str(directory / 'plots' / figname)
-            fig.savefig(full_figname)
+            full_figname = str(directory / 'plots2' / figname)
+            fig.savefig(full_figname, dpi=300)
             plt.close(fig)
             print('>', figname)
             alt_tit = '%s, %d' % (dist_code, num_obvs)
@@ -134,8 +220,8 @@ def do_plot_exp02(directory):
             ##lines.append('<h2>N = %d</h2>' % (num_obvs,))
             fig = _plot_fig(plt, sns, dist_code, num_obvs, wavelets, df, excess=1)
             figname = 'plot-%s-%d-D1.png' % (dist_code, num_obvs)
-            full_figname = str(directory / 'plots' / figname)
-            fig.savefig(full_figname)
+            full_figname = str(directory / 'plots2' / figname)
+            fig.savefig(full_figname, dpi=300)
             plt.close(fig)
             print('>', figname)
             alt_tit = '%s, %d' % (dist_code, num_obvs)
@@ -153,7 +239,7 @@ def do_plot_exp02(directory):
         if planx < 3:
             lines.append('<footer />\n')
     lines.append(_HTML_END)
-    with open(str( directory / 'plots' / 'plots.html'), 'w') as fh:
+    with open(str( directory / 'plots2' / 'plots.html'), 'w') as fh:
         fh.writelines(lines)
     print('> plots.html')
 
@@ -165,8 +251,10 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df, excess=0):
     df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)]
     max_hd = np.percentile(df1.hd, 95)
     kde_hd = {}
-    for ix, row in df[df.algorithm == 'KDE'].iterrows():
+    for ix, row in df1[df1.algorithm == 'KDE'].iterrows():
         kde_hd[row.sample_no] = row.hd
+    avg_hd = sum(kde_hd.values()) / len(kde_hd.values())
+    print(dist_code, num_obvs, avg_hd)
     _HD = {'normed': '$HD_1$', 'diff': '$HD_2$'}
     _TH = {SPWDE.TH_CLASSIC: '$C$',
            SPWDE.TH_ADJUSTED: '$C\sqrt{\Delta j}$',
@@ -181,7 +269,7 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df, excess=0):
         # print(df.wave_name.unique())
         # print(dist_code, num_obvs, wave_name)
         df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs) & (df.wave_name == wave_name) &
-                 (df.best_j + excess == df.start_j + df.delta_j)].copy()
+                 (df.best_j + excess == df.start_j + df.delta_j) & (df.algorithm == 'WDE')].copy()
         print(df1.shape, end='; ')
         if df1.shape[0] == 0:
             print(dist_code, num_obvs, wave_name, excess)
@@ -193,8 +281,9 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df, excess=0):
         df1['mode'] = df1.apply(func, axis=1)
         # copy one
         df2 = df1[df1.delta_j == df1.delta_j.min()].copy()
-        df2['hd'] = df2.apply(lambda row: kde_hd[row.sample_no], axis=1)
+        df2['hd'] = df2.apply(lambda row: kde_hd.get(row.sample_no, -1), axis=1)
         df2['delta_j'] = 'kde'
+        df2 = df2[df2.hd != -1]
         df2.reset_index()
 
         df1 = pd.concat([df1, df2])
@@ -238,7 +327,7 @@ def _plot_true(plt, dist_code):
     azim = -60
     ax.view_init(elev, azim)
     ax.plot_surface(xx, yy, zz / zz_sum, edgecolors='k', linewidth=0.5, cmap='BuGn')
-    ax.set_title(_EX[dist.code])
+    #ax.set_title(_EX[dist.code])
     ax.set_zlim(0, 1.1 * max_v)
     return fig
 
