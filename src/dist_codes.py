@@ -49,6 +49,57 @@ def _pdf(probs, dists, grid):
     return pdf_vals
 
 
+class PlateauDist(object):
+    def __init__(self, points, inner, code='plt1'):
+        self.code = code
+        self.dim = 2
+        x0, y0 = points[0]
+        x1, y1 = points[1]
+        a0, b0 = inner[0]
+        a1, b1 = inner[1]
+        assert x0 <= a0 <= a1 and a0 <= a1 <= x1
+        assert y0 <= b0 <= b1 and b0 <= b1 <= y1
+        height = 1
+        pp1 = [(x, y, 0) for x,y in [(x0,y0), (x0,y1), (x1,y1), (x1,y0)]]
+        pp2 = [(x, y, height) for x,y in [(a0,b0), (a0,b1), (a1,b1), (a1,b0)]]
+        pp = np.array(pp1 + pp2)
+        self.fun = LinearNDInterpolator(pp[:,0:2], pp[:,2], fill_value=0.0)
+        nn = 512
+        xx, yy = np.meshgrid(np.linspace(0, 1, nn), np.linspace(0, 1, nn))
+        zz = self.pdf((xx, yy))
+        print('Plateau sum=', zz.mean())
+        self.height = 1 / zz.mean()
+        pp1 = [(x, y, 0) for x,y in [(x0,y0), (x0,y1), (x1,y1), (x1,y0)]]
+        pp2 = [(x, y, self.height) for x,y in [(a0,b0), (a0,b1), (a1,b1), (a1,b0)]]
+        pp = np.array(pp1 + pp2)
+        self.fun = LinearNDInterpolator(pp[:,0:2], pp[:,2], fill_value=0.0)
+        minp = np.array([x0, y0])
+        maxp = np.array([x1, y1])
+        self.gen = lambda : np.random.rand(2) * (maxp - minp) + minp
+
+    def rvs(self, num):
+        data = []
+        while num > 0:
+            pp = self.gen()
+            u = random.random()
+            if u <= max(0,self.fun(*pp)) / self.height:
+                data.append(pp)
+                num -= 1
+                if num == 0:
+                    break
+        return np.array(data)
+
+    def pdf(self, grid):
+        if type(grid) == tuple or type(grid) == list:
+            X, Y = grid
+            grid = np.array((X.flatten(), Y.flatten())).T
+            vals = np.clip(self.fun(grid),0,None)
+            vals = vals.reshape(X.shape[0], Y.shape[0])
+            return vals
+        else:
+            return np.clip(self.fun(grid),0,None)
+
+
 class TempleDist(object):
     def __init__(self, points, centre, code='tem1'):
         self.code = code
@@ -686,6 +737,8 @@ def dist_from_code(code):
             ws,
             [dist1, dist2],
             code)
+    elif code == 'plt1':
+        return PlateauDist([(0.125, 0.125), (0.875, 0.875)], [(0.175, 0.4), (0.8, 0.8)])
     elif code == 'tpx1':
         # 10 mins to generate samples
         sigma = 0.3

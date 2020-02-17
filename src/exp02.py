@@ -249,7 +249,7 @@ def _plot_fig(plt, sns, dist_code, num_obvs, waves, df, excess=0):
     fig, axs = plt.subplots(3, 1, sharey=True, sharex=True, figsize=(10, 9))
     # wave_name -> mode -> th_mode -> delta_j
     df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)]
-    max_hd = np.percentile(df1.hd, 95)
+    max_hd = np.percentile(df1.hd, 99)
     kde_hd = {}
     for ix, row in df1[df1.algorithm == 'KDE'].iterrows():
         kde_hd[row.sample_no] = row.hd
