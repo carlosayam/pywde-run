@@ -260,6 +260,15 @@ class TruncatedMultiNormalD(object):
         nns = reduce(lambda x, y: (x-1) * (y-1), z.shape)
         self.sum = z.sum()/nns
 
+    def latex(self):
+        def mn_latex(mult_norm):
+            mean = '(%s)' % (', '.join(['%.5f' % v for v in mult_norm.mean]))
+            rows = [' & '.join(['%.5f' % v for v in row]) for row in mult_norm.cov]
+            cov = '\\begin{pmatrix}%s\\end{pmatrix}' % '\\\\\n'.join(rows)
+            return '\\mathcal{N}\\left(%s, %s\\right)' % (mean, cov)
+        resp = '\\\\\n&+\,'.join([r'%.5f\,%s' % (pp, mn_latex(dd)) for pp,dd in zip(self.probs, self.dists)])
+        return resp
+
     def mathematica(self):
         # render Mathematica code to plot
         def fn(norm_dist):

@@ -1,5 +1,6 @@
 import os
 import pathlib
+from itertools import zip_longest
 
 import numpy as np
 
@@ -8,6 +9,13 @@ from statsmodels.nonparametric.kernel_density import KDEMultivariate
 
 ROOT_DIR = pathlib.Path('RESP')
 NUM_SAMPLES = 100
+
+
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fillvalue)
 
 
 def fname(what, dist_name, num=None, wave_name=None, delta_j=None, ext='.png'):

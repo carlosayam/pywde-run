@@ -1,0 +1,60 @@
+\begin{table}[H]
+	\fontsize{7}{10}\selectfont
+	\centering
+	\begin{minipage}[t]{0.95\textwidth}
+		\centering
+		\begin{tabular}{|r|r|r|r|r|r|r|r|r|r|r|r|}
+			\hline
+			\multirow{2}{*}{\textbf{n}} & \multirow{2}{*}{${}_p\widehat{\mathcal{B}}_J$} & \multirow{2}{*}{$\Delta J$} & \multicolumn{3}{c|}{\textbf{$\lambda$}} & \multicolumn{3}{c|}{\textbf{$\lambda\,\sqrt{\Delta J}$}} & \multicolumn{3}{c|}{\textbf{$\lambda\,\sigma^B$}} \\
+			\cline{4-12}
+			& & & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ \\
+			\hline
+			<<#Items>>
+			%% <<LinNum>> (<<TH1NumCoeffs>>) (<<TH2NumCoeffs>>) (<<TH3NumCoeffs>>)
+			<<#FirstNum>>
+			\multirow{6}{*}{<<Num>>} &
+			<</FirstNum>>
+			<<^FirstNum>>
+			&
+			<</FirstNum>>
+			<<#FirstHD>>
+			\multirow{3}{*}{<<HD>>} &
+			<</FirstHD>>
+			<<^FirstHD>>
+			&
+			<</FirstHD>>
+			<<JLevel>> &
+			{\tiny <<TH1Q1>>} &
+			<<#TH1Ok>>
+			\textbf{<<TH1Avg>>} &
+			<</TH1Ok>>
+			<<^TH1Ok>>
+			<<TH1Avg>> &
+			<</TH1Ok>>
+			{\tiny <<TH1Q3>>} &
+			{\tiny <<TH2Q1>>} &
+			<<#TH2Ok>>
+			\textbf{<<TH2Avg>>} &
+			<</TH2Ok>>
+			<<^TH2Ok>>
+			<<TH2Avg>> &
+			<</TH2Ok>>
+			{\tiny <<TH2Q3>>} &
+			{\tiny <<TH3Q1>>} &
+			<<#TH3Ok>>
+			\textbf{<<TH3Avg>>} &
+			<</TH3Ok>>
+			<<^TH3Ok>>
+			<<TH3Avg>> &
+			<</TH3Ok>>
+			{\tiny <<TH3Q3>>}
+			\\
+			<<Border>>
+			<</Items>>
+		\end{tabular}
+	\end{minipage}
+    \caption[Number of coefficients for non-linear estimators using <<WaveName>> for <<DensityName>>]
+	{Number of wavelet coefficients using the <<WaveName>> wavelet for the density <<DensityName>> (Figure
+	\ref{fig:truedenshardt} <<FigureLetter>>). Corresponding table for Hellinger distance is \ref{tab:<<DensityCode>>}}
+	\label{tab:<<DensityCode>>Coeffs}
+\end{table}

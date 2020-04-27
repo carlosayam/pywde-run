@@ -1,8 +1,4 @@
-\begin{table}[ht!]\label{tab:<<DensityCode>>}
-	\caption[(Approximated) Hellinger distance comparison of non-linear estimators vs. KDE estimator for <<DensityName>>]
-	{(Approximated) Mean Squared Hellinger Distance (MSHD) for the various non linear estimator algorithms using the
-	<<WaveName>> wavelet for the density <<DensityName>> (Figure \ref{fig:truedenshardt} <<FigureLetter>>).
-	See text for column descriptions.}
+\begin{table}[ht!]
 	\fontsize{7}{10}\selectfont
 	\centering
 	\begin{minipage}[t]{0.95\textwidth}
@@ -14,7 +10,7 @@
 			& & & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ & $Q_1$ & $Med$ & $Q_3$ & \\
 			\hline
 			<<#Items>>
-			%% <<LinNum>>
+			%% <<LinNum>> (<<TH1NumCoeffs>>) (<<TH2NumCoeffs>>) (<<TH3NumCoeffs>>)
 			<<#FirstNum>>
 			\multirow{6}{*}{<<Num>>} &
 			<</FirstNum>>
@@ -62,4 +58,9 @@
 			<</Items>>
 		\end{tabular}
 	\end{minipage}
+    \caption[(Approximated) Hellinger distance comparison of non-linear estimators vs. KDE estimator for <<DensityName>>]
+	{(Approximated) Median Squared Hellinger Distance (MSHD) for the various non linear estimator algorithms using the
+	<<WaveName>> wavelet for the density <<DensityName>> (Figure \ref{fig:truedenshardt} <<FigureLetter>>).
+	See text for column descriptions.}
+	\label{tab:<<DensityCode>>}
 \end{table}

@@ -279,12 +279,45 @@ def exp02_tex_table(directory):
 
 @main.command()
 @click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp02_tex_table2(directory):
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    from exp02 import do_tex_table2_exp02
+    do_tex_table2_exp02(directory)
+
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def exp02_geyser(directory):
+    "Generates the plots for the Old Faithful dataset as per text"
+    from exp02 import do_geyser_plots
+    do_geyser_plots(directory)
+
+
+@main.command()
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
 def exp02_repl(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
     from exp02 import exp02_repl
     exp02_repl(directory)
 
 
+@main.command()
+@click.option('--path', type=str, default='mnist')
+def mnist_labels(**kwargs):
+    "Load the training files and stores index for all labels in separate files"
+    from mnist import calc_labels
+    calc_labels(kwargs['path'])
+
+
+
+@main.command()
+@click.argument('label')
+@click.option('--path', type=str, default='mnist')
+@click.option('--wave', type=str, default='sym3')
+def mnist_diffs(label, **kwargs):
+    "Calculate the image metrics for a label"
+    from mnist import calc_diffs_all
+    calc_diffs_all(label, kwargs['path'], kwargs['wave'])
 
 
 @main.command()

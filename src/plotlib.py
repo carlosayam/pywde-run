@@ -1,12 +1,11 @@
 import random
+import csv
 
 import numpy as np
 import scipy.integrate as integrate
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from scipy import interpolate
-from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from common import hellinger_distance_pdf, hellinger_distance
 
 
@@ -25,6 +24,44 @@ def calc_maxv(dist):
     zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
     print('int =', zz_sum)
     return (zz / zz_sum).max()
+
+def dump_dist(fname, dist):
+    grid_n = 256
+    xx, yy = grid_as_vector(grid_n)
+    zz = dist.pdf((xx, yy))
+    print('sum=', zz.mean())
+    zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
+    print('int =', zz_sum)
+    max_v = (zz / zz_sum).max()
+    print(zz.shape)
+    with open(fname, 'wt') as fh:
+        fh.write('data = {')
+        for ix in range(grid_n):
+            ll = []
+            for zv in zz[ix,:]:
+                ll.append('%f' % zv)
+            vals = ','.join(ll)
+            fh.write(f'{{{vals}}}')
+            if ix < 255:
+                fh.write(',\n')
+            else:
+                fh.write('\n')
+        fh.write('};\n')
+    print('%s saved' % fname)
+
+
+def preplot_dist(fname, dist):
+    grid_n = 256
+    xx, yy = grid_as_vector(grid_n)
+    zz = dist.pdf((xx, yy))
+    print('sum=', zz.mean())
+    zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
+    print('int =', zz_sum)
+    with open(fname, 'tw') as fh:
+        writer = csv.writer(fh)
+        for point in zip(xx.flatten(), yy.flatten(), zz.flatten() / zz_sum):
+            writer.writerow(point)
+    print(f'{fname} generated')
 
 
 def plot_dist(fname, dist, elev=None, azim=None):
@@ -97,10 +134,16 @@ def do_plot_wde(wde, fname, dist, interact=None):
 
 def do_plot_pdf(pdf, fname, dist, interact=None):
     print('Plotting %s' % fname)
-    zlim = calc_maxv(dist)
-    hd, corr_factor = hellinger_distance_pdf(dist, pdf)
-    print('HD=', hd)
-    grid_n = 70 ## 70
+    if dist != 'geyser':
+        zlim = calc_maxv(dist)
+        hd, corr_factor = hellinger_distance_pdf(dist, pdf)
+        print('HD=', hd)
+    else:
+        zlim = 0.06
+        # max difference along axis=0 before transformation
+        corr_factor = 3.5 * 94.4
+        hd = 0.0
+    grid_n = 200 ## 70
     xx, yy = grid_as_vector(grid_n)
     pp = np.array((xx, yy))
     pp = pp.T.reshape(-1, 2)
@@ -111,6 +154,9 @@ def do_plot_pdf(pdf, fname, dist, interact=None):
     elev = 15
     azim = -60
     ax.view_init(elev, azim)
+    if dist == 'geyser':
+        xx = xx * 3.5 + 1.6
+        yy = yy * 94.4 + 43
     ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
     ax.set_zlim(0, zlim)
     ax.set_title(pdf.name + ('\nHD = %g' % hd), wrap=True)
@@ -119,12 +165,12 @@ def do_plot_pdf(pdf, fname, dist, interact=None):
         ##plt.savefig(fname)
     elif interact == 'save':
         print('Saving %s' % fname)
-        plt.savefig(fname)
+        plt.savefig(fname, dpi=300)
     else:
         raise ValueError('Unknown plot option %s' % interact)
 
 
-def do_pdf_contour(pdf, fname, dist):
+def do_pdf_contour(pdf, fname, dist, data=None):
     print('Plotting %s' % fname)
     hd, corr_factor = hellinger_distance_pdf(dist, pdf)
     print(pdf.name, 'HD=', hd)
@@ -139,7 +185,9 @@ def do_pdf_contour(pdf, fname, dist):
     fig = plt.figure()
     plt.title(pdf.name + ('\nHD = %g' % hd), wrap=True)
     print('max_z', max_z)
-    cs = plt.contour(xx, yy, zz, alpha=0.7, levels=np.linspace(0, max_z, 18))
+    cs = plt.contour(xx, yy, zz, alpha=0.3, levels=np.linspace(0, max_z, 18), linewidth=0.5)
+    if data is not None:
+        plt.scatter(data[:,0], data[:,1], s=0.1, alpha=0.75)
     plt.clabel(cs, inline=1, fontsize=10)
     ## plt.show()
     plt.savefig(fname)
@@ -231,22 +279,32 @@ def plot_trace(wde, fname):
 
 def do_plot_kde(kde, fname, dist, zlim):
     print('Plotting %s' % fname)
-    zlim = calc_maxv(dist)
-    hd, corr_factor = hellinger_distance(dist, kde)
-    print('kde HD=', hd)
+    if dist != 'geyser':
+        zlim = calc_maxv(dist)
+        hd, corr_factor = hellinger_distance_pdf(dist, kde)
+        print('kde HD=', hd)
+    else:
+        zlim = 0.06
+        # max difference along axis=0 before transformation
+        corr_factor = 3.5 * 94.4
+        hd = 0.0
     grid_n = 70 ## 70
     xx, yy = grid_as_vector(grid_n)
     grid2 = np.array((xx.flatten(), yy.flatten())).T
     vals = kde.pdf(grid2)
     zz = vals.reshape(xx.shape[0], yy.shape[0])
-
-    ##zz_sum = zz.sum() / grid_n / grid_n  # not always near 1
-
+    if dist == 'geyser':
+        xx = xx * 3.5 + 1.6
+        yy = yy * 94.4 + 43
+        zz = zz / corr_factor
     fig = plt.figure(figsize=(12,9))
     ax = fig.gca(projection='3d')
     elev = 15
     azim = -60
     ax.view_init(elev, azim)
+    if dist == 'geyser':
+        xx = xx * 3.5 + 1.6
+        yy = yy * 94.4 + 43
     ax.plot_surface(xx, yy, zz, edgecolors='k', linewidth=0.5, cmap=cm.get_cmap('BuGn'))
     ax.set_title(('KDE bw=%s' % str(kde.bw)) + ('\nHD = %g' % hd))
     ax.set_zlim(0, zlim)

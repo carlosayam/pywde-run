@@ -76,6 +76,27 @@ def do_compare_algos(directory):
         fh.writelines(lines)
     print('> plots.html')
 
+
+def do_geyser_plots(directory):
+    plt, sns = _init_(is_agg=True)
+    directory = Path(directory)
+    # orthogonal cases
+    # db3 ok, generate curve and plot, 2 levels
+    # - plot-geyser-curve-db3.png
+    # - plot-geyser-density-db3.png
+    # sym4 ok, generate curve and plot
+    # - plot-geyser-curve-sym4.png
+    # - plot-geyser-density-sym4.png
+    # db4 fails, generate curve and plot, 2 levels
+    # sym6 fails, generate curve and plot, 2 levels
+    # sym4 fails, generate curve and plot, 1 level
+    # sym4 "fails", generate curve and plot, 3 levels
+    # biorthogonal
+    # bior2.4 ok, generate curve and plot
+    # bior4.6
+
+
+
 def do_tex_table_exp02(directory):
     import pystache as ps
     with open('src/ch4.tex', 'rt') as fh:
@@ -103,9 +124,9 @@ def do_tex_table_exp02(directory):
         'db4': 'Daubechie 4',
         'sym3': 'Symlet 3'
     }
-    with open(str(directory / 'plots2' / 'ch4-th-table.tex'), 'wt') as fh:
-        fh.write('%% auto generated %%\n')
-        for dist_code, fig_letter, wave_name in dist_codes:
+    for dist_code, fig_letter, wave_name in dist_codes:
+        with open(str(directory / 'plots2' / 'ch4-th-table-%s.tex') % dist_code, 'wt') as fh:
+            fh.write('%% auto generated %%\n')
             ctx = {
                 'DensityName': _DENSITY_NAMES[dist_code],
                 'DensityCode': dist_code,
@@ -141,6 +162,8 @@ def do_tex_table_exp02(directory):
                             item['%sOk' % th_var] = avg <= kde_hd
                             item['%sAvg' % th_var] = avg
                             item['%sQ3' % th_var] = q3
+                            item['%sNumCoeffs' % th_var] = ':'.join(['%.1f' % v for v in
+                                                                     df1.num_coeffs.quantile([0.25, 0.50, 0.75])])
                         item['FirstNum'] = first_num
                         item['FirstHD'] = first_hd
                         if linnum % 6 == 5:
@@ -153,7 +176,7 @@ def do_tex_table_exp02(directory):
                         first_num = False
                         first_hd = False
                         linnum += 1
-                        print(item)
+                        ## print(item)
                         items.append(item)
             ctx['Items'] = items
             for line in ps.Renderer().render(tpl, **ctx).splitlines():
@@ -162,6 +185,96 @@ def do_tex_table_exp02(directory):
                     fh.write(line)
                     fh.write('\n')
 
+
+def do_tex_table2_exp02(directory):
+    import pystache as ps
+    with open('src/ch4-params.tex', 'rt') as fh:
+        tpl = ps.parse("\n".join(fh.readlines()), delimiters=('<<','>>'))
+    "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
+    directory = Path(directory)
+    df = _load_data(directory)
+    print('>>', list(df))
+    nums = [250, 500, 1000, 1500, 2000, 3000, 4000, 6000]
+    dist_codes = [('ex01', '(a)', 'db4'), ('ex02', '(b)', 'db4'), ('ex03', '(c)', 'sym3'), ('ex04', '(d)', 'sym3')]
+    os.makedirs(str(directory / 'plots2'), exist_ok=True)
+    _HD = [('normed', '${}_1\widehat{\mathcal{B}}_J$'), ('diff', '${}_2\widehat{\mathcal{B}}_J$')]
+    _TH = [
+        (SPWDE.TH_CLASSIC, 'TH1'),
+        (SPWDE.TH_ADJUSTED, 'TH2'),
+        (SPWDE.TH_EMP_STD, 'TH3')
+    ]
+    _DENSITY_NAMES = {
+        'ex01': 'Kurtotic Mixture 1',
+        'ex02': 'Mixture 2',
+        'ex03': '2D Comb 1 (claw)',
+        'ex04': '2D Smooth comb'
+    }
+    _WAVE_NAMES = {
+        'db4': 'Daubechies 4',
+        'sym3': 'Symlet 3'
+    }
+    for dist_code, fig_letter, wave_name in dist_codes:
+        with open(str(directory / 'plots2' / 'ch4-th-table2-%s.tex') % dist_code, 'wt') as fh:
+            fh.write('%% auto generated %%\n')
+            ctx = {
+                'DensityName': _DENSITY_NAMES[dist_code],
+                'DensityCode': dist_code,
+                'FigureLetter': fig_letter,
+                'WaveName': _WAVE_NAMES[wave_name]
+            }
+            fh.write('%% dist_code = %s\n' % dist_code)
+            items = []
+            linnum = 0
+            for idx_n, num_obvs in enumerate(nums):
+                first_num = True
+                df1 = df[(df.dist_code == dist_code) & (df.num_obvs == num_obvs)
+                         & (df.algorithm == 'KDE')].copy()
+                kde_q1, kde_hd, kde_q3 = df1.hd.quantile([0.25, 0.50, 0.75])
+                ## kde_hd = df1.hd.mean()
+                kde_hd = '%.4f' % kde_hd
+                for idx_p, hd_desc in enumerate(_HD):
+                    first_hd = True
+                    for j_level in [1,2,3]:
+                        item = {'Num': num_obvs, 'HD': hd_desc[1], 'JLevel': j_level}
+                        for th_desc in _TH:
+                            th_algo, th_var = th_desc
+                            df1 = df[ (df.dist_code == dist_code) & (df.num_obvs == num_obvs)
+                                      & (df.wave_name == wave_name) & (df.delta_j == j_level)
+                                      & (df.best_j == df.start_j + df.delta_j) & (df.algorithm == 'WDE')
+                                      & (df.opt_target == hd_desc[0]) & (df.treshold_mode == th_algo)].copy()
+                            q1, avg, q3 = df1.num_coeffs.quantile([0.25, 0.50, 0.75])
+                            ## avg = df1.hd.mean()
+                            q1 = '%.1f' % q1
+                            q3 = '%.1f' % q3
+                            avg = '%.1f' % avg
+                            _, avg_hd, _ = df1.hd.quantile([0.25, 0.50, 0.75])
+                            avg_hd = '%.4f' % avg_hd
+                            item['%sQ1' % th_var] = q1
+                            item['%sOk' % th_var] = avg_hd <= kde_hd
+                            item['%sAvg' % th_var] = avg
+                            item['%sQ3' % th_var] = q3
+                            item['%sNumCoeffs' % th_var] = ':'.join(['%.1f' % v for v in
+                                                                     df1.num_coeffs.quantile([0.25, 0.50, 0.75])])
+                        item['FirstNum'] = first_num
+                        item['FirstHD'] = first_hd
+                        if linnum % 6 == 5:
+                            item['Border'] = '\hline'
+                        elif linnum % 3 == 2:
+                            item['Border'] = '\cline{2-12}'
+                        else:
+                            item['Border'] = '\cline{3-12}'
+                        item['LinNum'] = linnum
+                        first_num = False
+                        first_hd = False
+                        linnum += 1
+                        ## print(item)
+                        items.append(item)
+            ctx['Items'] = items
+            for line in ps.Renderer().render(tpl, **ctx).splitlines():
+                line = line.rstrip()
+                if line:
+                    fh.write(line)
+                    fh.write('\n')
 
 def do_plot_exp02(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"

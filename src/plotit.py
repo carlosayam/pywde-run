@@ -1,6 +1,5 @@
 import atexit
 import csv
-import itertools as itt
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -16,7 +15,8 @@ from pywde.square_root_estimator import WaveletDensityEstimator
 from pywde.spwde import SPWDE
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from plotlib import (plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour,
-                     do_dist_contour, plot_energy, plot_trace, do_plot_pdf, do_pdf_contour)
+                     do_dist_contour, plot_energy, plot_trace, do_plot_pdf, do_pdf_contour,
+                     dump_dist, preplot_dist)
 
 
 def read_data(fname):
@@ -27,6 +27,23 @@ def read_data(fname):
             data.append(row)
         return np.array(data)
 
+def read_geyser():
+    with open('src/old-faithful.csv', 'r', newline='') as fh:
+        reader = csv.reader(fh, delimiter=',')
+        next(reader)
+        data = []
+        for row in reader:
+            data.append((float(row[1]), float(row[2])))
+        data = np.array(data)
+        return data
+
+
+def transform(data: np.ndarray):
+    minp = data.min(axis=0)
+    maxf = (data - minp).max(axis=0)
+    data = (data - minp) / maxf
+    inverse = lambda pp: pp * maxf + minp
+    return data, inverse
 
 
 @click.group()
@@ -54,6 +71,47 @@ def plot_true(dist_code, **kwargs):
 
 
 @main.command()
+@click.argument('dist_code', metavar="DIST_CODE")
+@click.argument('num_obvs', type=int, required=False, default=0)
+@click.argument('sample_no', type=int, required=False, default=0)
+@click.option('--contour', is_flag=True)
+def preplot_true(dist_code, **kwargs):
+    dist = dist_from_code(dist_code)
+    name = fname('true', dist_code, ext='.csv')
+    if kwargs['num_obvs']:
+        source = sample_name(dist_code, kwargs['num_obvs'], kwargs['sample_no'])
+        data = read_data(source)
+    else:
+        data = None
+    if kwargs['contour']:
+        do_dist_contour(name, dist, data)
+    else:
+        preplot_dist(name, dist)
+
+
+
+@main.command()
+@click.argument('dist_code', metavar="DIST_CODE")
+def dump_true(dist_code):
+    dist = dist_from_code(dist_code)
+    name = fname('true', dist_code, ext='.csv')
+    dump_dist(name, dist)
+
+
+
+@main.command()
+@click.argument('dist_code', metavar="DIST_CODE")
+@click.argument('letter')
+def latex(dist_code, letter):
+    dist = dist_from_code(dist_code)
+    print("""\\begin{footnotesize}
+\\begin{align*}
+f_{(%s)} &=\,%s
+\\end{align*}
+\\end{footnotesize}""" % (letter, dist.latex()))
+
+
+@main.command()
 @click.argument('dist_code')
 @click.argument('num_obvs', type=int)
 @click.argument('sample_no', type=int)
@@ -66,10 +124,17 @@ def plot_kde(dist_code, num_obvs, sample_no, **kwargs):
     :param sample_no:
     :return:
     """
-    dist = dist_from_code(dist_code)
-    source = sample_name(dist_code, num_obvs, sample_no)
-    data = read_data(source)
-    assert data.shape[0] == num_obvs
+    if dist_code == 'geyser':
+        data = read_geyser()
+        data, inverse = transform(data)
+        num_obvs = data.shape[0]
+        sample_no = 1
+        dist = 'geyser'
+    else:
+        dist = dist_from_code(dist_code)
+        source = sample_name(dist_code, num_obvs, sample_no)
+        data = read_data(source)
+        assert data.shape[0] == num_obvs
     kde = KDEMultivariate(data, 'c' * data.shape[1], bw='cv_ml')  ## cv_ml
     png_file = png_name(dist_code, num_obvs, sample_no, 'kde')
     if kwargs['contour']:
@@ -209,18 +274,27 @@ def plot_best_j(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
 @click.option('--k', type=int, default=1)
 @click.option('--excess-j', default=0)
 @click.option('--contour', is_flag=True)
+@click.option('--num-max', type=int, default=1)
 def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode, **kwargs):
     """
     Calculates WDE for best threshold options.
     J0 = Best J0 - delta_j
     """
-    dist = dist_from_code(dist_code)
     k = kwargs['k']
+    num_max = kwargs.get('num_max', 1)
     what = 'best_j' + ('.k_%d' % k)
     excess_j = kwargs['excess_j']
-    source = sample_name(dist_code, num_obvs, sample_no)
-    data = read_data(source)
-    assert data.shape[0] == num_obvs
+    if dist_code == 'geyser':
+        data = read_geyser()
+        data, inverse = transform(data)
+        num_obvs = data.shape[0]
+        sample_no = 1
+        dist = 'geyser'
+    else:
+        dist = dist_from_code(dist_code)
+        source = sample_name(dist_code, num_obvs, sample_no)
+        data = read_data(source)
+        assert data.shape[0] == num_obvs
     spwde = SPWDE(((wave_name, 0), (wave_name, 0)), k=1)
     best_j = spwde.best_j(data, mode=target, stop_on_max=True)
     j0 = best_j - delta_j
@@ -230,7 +304,7 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
     what = wave_name + '-' + what
     png_file = png_name(dist_code, num_obvs, sample_no, what)
     spwde = SPWDE(((wave_name, j0), (wave_name, j0)), k=k)
-    spwde.best_c(data, delta_j, target, th_mode=mode)
+    spwde.best_c(data, delta_j, target, th_mode=mode, num_max=num_max)
     # return # << !!!
     pdf = spwde.best_c_found[0]
     cc = spwde.best_c_found[1]
@@ -244,13 +318,14 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
             subtit = ''
         title = ("%s - %s\n" r"$J_0 = %d$, $\Delta J = %d$, %s" % (dist_code, wave_name, j0, delta_j, subtit))
         ax = sns.lineplot(xy[:,0], xy[:,1])
-        ax.set_title(title)
+        ## ax.scatter(xy[:,0], xy[:,1], c='r', s=1.5)
+        ## ax.set_title(title)
         mode_ix = 1 if target == SPWDE.TARGET_NORMED else 2
-        ax.set(xlabel="$C$", ylabel=r"$\hat{B}_%d(C)$" % mode_ix, )
-        ax.fill_between(xy[:,0], xy[:,1]-3*xy[:,2], xy[:,1]+3*xy[:,2], alpha=0.3)
+        ax.set(xlabel="$\lambda$", ylabel=r"${}_%d\widehat{\mathcal{B}}_J(\lambda)$" % mode_ix, )
+        #ax.fill_between(xy[:,0], xy[:,1]-3*xy[:,2], xy[:,1]+3*xy[:,2], alpha=0.3)
         plt.show()
     if kwargs['contour']:
-        do_pdf_contour(pdf, 'test3-%s.png' % cc[0], dist)
+        do_pdf_contour(pdf, 'test3-%s.png' % cc[0], dist, data)
     else:
         do_plot_pdf(pdf, 'test3-%s.png' % cc[0], dist, 'view')
 
@@ -310,6 +385,7 @@ def plot_greedy(dist_code, num_obvs, sample_no, wave_name, delta_j, target, **kw
     else:
         do_plot_pdf(pdf, 'test3-%s.png' % cc, dist, 'view')
 
+
 @main.command()
 @click.argument('dist_name', metavar="DIST_CODE")
 @click.argument('wave_name', metavar="WAVE_CODE")
@@ -327,6 +403,7 @@ def run_with(dist_name, wave_name, num, ix, delta_js):
         for row in calc_with(dist_name, wave_name, num, i0, numi, delta_js):
             writer.writerow(row)
             fh.flush()
+
 
 def calc_with(dist_name, wave_name, num, i0, numi, delta_js):
     dist = dist_from_code(dist_name)
