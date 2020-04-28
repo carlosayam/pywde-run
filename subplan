@@ -201,6 +201,43 @@ def batch_best_c(num_obvs, **kwargs):
     jobs.process()
     print('TOTAL JOBS :', jobs.num_jobs)
 
+
+@main.command()
+@click.argument('label', type=int)
+def batch_mnist_diffs(num_obvs, **kwargs):
+    """
+    Launch jobs to mnist diffs
+    """
+
+    class GenDiffs(object):
+        def __init__(self, label):
+            self._label = label
+            self._path = Path('RESP') / 'mnist' / 'diffs'
+            self._plan_name = None
+
+        def mkdirs(self):
+            os.mkdirs(str(self._path), exist_ok=True)
+
+        def write_plan(self):
+            self._plan_name = str(self._path / ('plan-%d.pbs' % label))
+            with open(self._plan_name, 'wt') as fh:
+                plan = PLAN % {'exp_dir': 'mnist/diffs'}
+                fname_result = 'diff-%d.csv' % label
+                fh.write(plan)
+                fh.write('rm -f "%s"\n' % fname_result)
+                line = 'python3 $SW_DIR/src/runit.py mnist-diffs %d\n' % label
+                fh.write(line)
+            return self._plan_name
+
+    for label in range(10):
+        task = GenDiffs(label)
+        task.mkdirs()
+        plan_name = task.write_plan()
+        args, cwd = popen_args(plan_name, 'MNIST%d' % label, timedelta(seconds=6*3600))
+        print(' '.join(args))
+        # subprocess.call(args)
+
+
 class JobList(object):
     def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_hours=6):
         self._job_name = job_name

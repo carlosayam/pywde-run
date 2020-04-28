@@ -163,19 +163,12 @@ def calc_diffs_all(label, path, wave_name):
         writer.writerow(['num1', 'num2', 'pos1', 'pos2', 'angle'])
         reader = LabelReader(Path('RESP') / 'mnist' / 'labels', label, get_image)
         total = len(reader)
-        exp = total * (total - 1) // 2
-        num = 0
         for pos1 in range(total - 1):
             num1, img1 = reader[pos1]
             for pos2 in range(pos1 + 1, total):
                 num2, img2 = reader[pos2]
                 angle = calc_diff(img1, img2, wave_name=wave_name)
                 writer.writerow([num1, num2, pos1, pos2, angle])
-                num += 1
-                if num % 1000 == 0:
-                    print('\n%d/%d ' % (num, exp))
-                else:
-                    print('.', end='')
     print('label', label, '; total =', total)
 
 
