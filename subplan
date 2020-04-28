@@ -215,7 +215,7 @@ def batch_mnist_diffs():
             self._plan_name = None
 
         def mkdirs(self):
-            os.mkdirs(str(self._path), exist_ok=True)
+            os.mkdir(str(self._path), exist_ok=True)
 
         def write_plan(self):
             self._plan_name = str(self._path / ('plan-%d.pbs' % label))
