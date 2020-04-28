@@ -203,8 +203,7 @@ def batch_best_c(num_obvs, **kwargs):
 
 
 @main.command()
-@click.argument('label', type=int)
-def batch_mnist_diffs(num_obvs, **kwargs):
+def batch_mnist_diffs():
     """
     Launch jobs to mnist diffs
     """
