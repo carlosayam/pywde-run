@@ -309,6 +309,14 @@ def mnist_labels(**kwargs):
     calc_labels(kwargs['path'])
 
 
+@main.command()
+@click.option('--path', type=str, default='mnist')
+def mnist_others(**kwargs):
+    "Load the training files and stores index for all labels in separate files"
+    from mnist import calc_labels_others
+    calc_labels_others(kwargs['path'])
+
+
 
 @main.command()
 @click.argument('label')
@@ -318,6 +326,39 @@ def mnist_diffs(label, **kwargs):
     "Calculate the image metrics for a label"
     from mnist import calc_diffs_all
     calc_diffs_all(label, kwargs['path'], kwargs['wave'])
+
+
+@main.command()
+@click.argument('label')
+@click.option('--path', type=str, default='RESP/mnist')
+def mnist_means(label, **kwargs):
+    "Calculate the image metrics for a label"
+    from mnist import calc_spectral_clustering
+    calc_spectral_clustering(label, kwargs['path'])
+
+
+@main.command()
+@click.argument('k', type=int, default=1)
+def mnist_knn(k):
+    "Calculate the image metrics for a label"
+    from mnist import error_on_test
+    error_on_test(k)
+
+
+
+@main.command()
+@click.argument('img1', type=int)
+@click.argument('img2', type=int)
+def mnist_test(img1, img2):
+    "Calculate log_img1 (img2)"
+    from mnist import MnistLoad, DatasetKind, DwtImg
+    loader = MnistLoad(DatasetKind.TRAINING)
+    obj1 = DwtImg(loader.get_image(img1))
+    obj2 = DwtImg(loader.get_image(img2))
+    import code
+    code.interact('**', local=locals())
+
+
 
 
 @main.command()

@@ -13,6 +13,7 @@ from common import *
 from mpl_toolkits.mplot3d import Axes3D
 from pywde.square_root_estimator import WaveletDensityEstimator
 from pywde.spwde import SPWDE
+from pywde.logwde import LOGWDE
 from statsmodels.nonparametric.kernel_density import KDEMultivariate
 from plotlib import (plot_dist, do_plot_kde, do_plot_wde, do_kde_contour, do_wde_contour,
                      do_dist_contour, plot_energy, plot_trace, do_plot_pdf, do_pdf_contour,
@@ -328,6 +329,46 @@ def plot_best_c(dist_code, num_obvs, sample_no, wave_name, delta_j, target, mode
         do_pdf_contour(pdf, 'test3-%s.png' % cc[0], dist, data)
     else:
         do_plot_pdf(pdf, 'test3-%s.png' % cc[0], dist, 'view')
+
+
+@main.command()
+@click.argument('dist_code')
+@click.argument('num_obvs', type=int)
+@click.argument('sample_no', type=int)
+@click.argument('wave_name')
+@click.argument('mode', type=click.Choice([SPWDE.TARGET_DIFF, SPWDE.TARGET_NORMED]))
+@click.option('--k', type=int, default=1)
+@click.option('--j0', type=int, default=0)
+@click.option('--fail-fast', is_flag=True, default=True)
+@click.option('--contour', is_flag=True)
+def plot_best_j_log(dist_code, num_obvs, sample_no, wave_name, mode, **kwargs):
+    """
+    Calculates WDE-log for given k, j0 and delta-j for all possible options
+    """
+    dist = dist_from_code(dist_code)
+    k = kwargs['k']
+    what = 'best_j' + ('.k_%d' % k)
+    j0 = kwargs['j0']
+    what = what + ('.j0_%d' % j0)
+    what = wave_name + '-' + what
+    png_file = png_name(dist_code, num_obvs, sample_no, what)
+    source = sample_name(dist_code, num_obvs, sample_no)
+    data = read_data(source)
+    assert data.shape[0] == num_obvs
+    # wde = WaveletDensityEstimator(((wave_name, j0), (wave_name, j0)), k=k)
+    # wde.best_j(data)
+    spwde = LOGWDE(((wave_name, j0), (wave_name, j0)), k=k)
+    spwde.best_j(data, mode=mode)
+    # return # << !!!
+    for data_for_j in spwde.best_j_data:
+        j, is_best, b_hat_j, pdf, elapsed = data_for_j
+        print(j, is_best, '\tB hat =', b_hat_j, 't =', elapsed)
+        if is_best:
+            pdf.name = pdf.name + (' (best %s)' % mode)
+        if kwargs['contour']:
+            do_pdf_contour(pdf, 'test2-%d.png' % j, dist)
+        else:
+            do_plot_pdf(pdf, 'test2-%d.png' % j, dist, 'view')
 
 
 @main.command()
