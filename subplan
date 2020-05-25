@@ -237,6 +237,53 @@ def batch_mnist_diffs():
         # subprocess.call(args)
 
 
+@main.command()
+@click.argument('corpus')
+def batch_mnist_test(corpus):
+    """
+    Launch jobs to mnist test
+    """
+
+    class GenErrors(object):
+        def __init__(self, corpus, aff, embed, nmeans, knn):
+            pass
+
+        def mkdirs(self):
+            os.mkdir(str(self._path), exist_ok=True)
+
+        def write_plan(self):
+            self._plan_name = str(self._path / ('plan-%d.pbs' % label))
+            with open(self._plan_name, 'wt') as fh:
+                plan = PLAN % {'exp_dir': 'mnist/diffs'}
+                fname_result = 'diff-%d.csv' % label
+                fh.write(plan)
+                fh.write('rm -f "%s"\n' % fname_result)
+                line = 'python3 $SW_DIR/src/runit.py mnist-diffs %d\n' % label
+                fh.write(line)
+            return self._plan_name
+
+    # @click.argument('corpus')
+    # @click.argument('affinity', type=click.Choice(['dist', '0.2', '0.4', '0.6', '0.8', '1.0']))
+    # @click.argument('embed', type=click.Choice(['no', '3', '5', '8', '13']))
+    # @click.argument('means')
+    # @click.argument('knn', type=int)
+    affinities = ['dist', '0.2', '0.4', '0.6', '0.8', '1.0']
+    embeddings = ['no', '3', '5', '8', '13']
+    means = ['25', '50', '75', '100', '150', '200']
+    for aff, embed, nmeans in itt.product((affinities, embeddings, means)):
+        task = GenErrors(corpus, aff, embed, nmeans, 1)
+        task.mkdirs()
+        plan_name = task.write_plan()
+        plan_id = f'{corpus}_{aff}_{embed}_{nmeans}_1'
+        # nmeans * n_classes * n_test * dist/unit * n_test_rounds + 10 mins_prep
+        plan_secs = int(nmeans) * 10 * 10000 * 0.0006 * 10 + 600
+        plan_secs = 900 * (int(plan_secs / 900) + 1)
+        args, cwd = popen_args(plan_name, plan_id, timedelta(seconds=plan_secs))
+        print(' '.join(args))
+        # subprocess.call(args)
+
+
+
 class JobList(object):
     def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_hours=6):
         self._job_name = job_name

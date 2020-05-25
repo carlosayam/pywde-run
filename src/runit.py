@@ -302,20 +302,20 @@ def exp02_repl(directory):
 
 
 @main.command()
-@click.option('--path', type=str, default='mnist')
-def mnist_labels(**kwargs):
-    "Load the training files and stores index for all labels in separate files"
-    from mnist import calc_labels
-    calc_labels(kwargs['path'])
+@click.argument('corpus')
+def mnist_labels(corpus):
+    """Load the training files and stores index for all labels in separate files; it also generates a sample
+    of counter examples in a separate file"""
+    from mnist import CalcLabels
+    CalcLabels(corpus).run()
 
 
 @main.command()
-@click.option('--path', type=str, default='mnist')
-def mnist_others(**kwargs):
-    "Load the training files and stores index for all labels in separate files"
-    from mnist import calc_labels_others
-    calc_labels_others(kwargs['path'])
-
+@click.argument('corpus')
+def mnist_convert(corpus):
+    "Convert calculated differences to .npz format"
+    from mnist import ConvertDiffs
+    ConvertDiffs(corpus).run()
 
 
 @main.command()
@@ -325,16 +325,30 @@ def mnist_others(**kwargs):
 def mnist_diffs(label, **kwargs):
     "Calculate the image metrics for a label"
     from mnist import calc_diffs_all
-    calc_diffs_all(label, kwargs['path'], kwargs['wave'])
+    calc_diffs_all(label, kwargs['wave'])
 
 
 @main.command()
-@click.argument('label')
-@click.option('--path', type=str, default='RESP/mnist')
-def mnist_means(label, **kwargs):
+@click.argument('corpus')
+@click.argument('affinity', type=click.Choice(['dist', '0.2', '0.4', '0.6', '0.8', '1.0']))
+@click.argument('embed', type=click.Choice(['no', '3', '5', '8', '13']))
+@click.argument('means')
+@click.argument('knn', type=int)
+def mnist_karcher(corpus, affinity, embed, means, knn):
     "Calculate the image metrics for a label"
-    from mnist import calc_spectral_clustering
-    calc_spectral_clustering(label, kwargs['path'])
+    from mnist import CalcKarcherMeans
+    CalcKarcherMeans(corpus, affinity, embed, means, knn).run()
+
+
+@main.command()
+@click.argument('corpus')
+@click.argument('label')
+@click.argument('means', type=int)
+@click.argument('knn', type=int)
+def mnist_random(label):
+    "Calculate the image metrics for a label"
+    from mnist import CalcRandomCenters
+    CalcRandomCenters(label)
 
 
 @main.command()

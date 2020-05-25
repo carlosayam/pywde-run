@@ -7,18 +7,25 @@ import pickle
 import sys
 from collections import defaultdict
 from pathlib import Path
-from random import random
+from datetime import datetime
 
 from typing import Tuple, List, Optional, Dict
 
 import numpy as np
 import pandas as pd
 from scipy.sparse import coo_matrix
+from sklearn.manifold import SpectralEmbedding
+from sklearn.cluster import KMeans
 
 from common import ensure_dir
 
+# mnist
+# DB_PATH = './mnist'
+# EXP_PATH = './RESP/mnist'
+# fsion
 DB_PATH = './mnist'
 EXP_PATH = './RESP/mnist'
+
 
 #
 # Based on
@@ -53,10 +60,11 @@ EXP_PATH = './RESP/mnist'
 # 9: [walltime 3:17:26.720949]
 
 
-
 class DatasetKind(enumerate):
     TRAINING = 'training'
     TEST = 'test'
+
+
 
 class LabelReader(object):
     def __init__(self, path, label, loader: 'MnistLoad'):
@@ -119,9 +127,11 @@ class MnistLoad(object):
     -- num : int, numer of images
     """
 
-    def __init__(self, dataset):
+    def __init__(self, corpus, dataset):
 
-        path = DB_PATH
+        assert corpus in ['mnist', 'fsion']
+
+        path = str(Path('RESP') / corpus / 'corpus')
 
         if dataset is DatasetKind.TRAINING:
             fname_img = os.path.join(path, 'train-images-idx3-ubyte')
@@ -135,7 +145,6 @@ class MnistLoad(object):
         # Load everything in some numpy arrays
         with open(fname_lbl, 'rb') as flbl:
             magic, num = struct.unpack(">II", flbl.read(8))
-            print(magic, num)
             self.lbl = np.fromfile(flbl, dtype=np.int8)
 
         with open(fname_img, 'rb') as fimg:
@@ -153,6 +162,12 @@ class MnistLoad(object):
 
     def __len__(self):
         return len(self.lbl)
+
+    def filter_label(self, label):
+        return np.where(self.lbl == label)[0]
+
+    def filter_no_label(self, label):
+        return np.where(self.lbl != label)[0]
 
 
 class DwtImg(object):
@@ -292,14 +307,10 @@ class DwtImg(object):
 
 
 class KarcherEstimator(object):
-    def __init__(self, k=1):
-        self._means: Dict[int, List[DwtImg]] = {}
-        for label in range(10):
-            fmeans = str(str(Path(EXP_PATH) / 'knn' / f'means-{label}.pickle'))
-            with open(fmeans, 'rb') as fh:
-                imgs = pickle.load(fh)
-                self._means[label] = [DwtImg(img, name=f'karcher-{label}-{ix+1}') for ix, img in enumerate(imgs)]
-        print(f'All Karcher means loaded')
+    def __init__(self, means_all, k):
+        for lbl in sorted(means_all.keys()):
+            print('Means ', lbl, len(means_all[lbl]))
+        self._means: Dict[int, List[DwtImg]] = means_all
         assert type(k) == int and k >= 1 and k <= min([len(v) for v in self._means.values()])
         self._k = k
 
@@ -327,42 +338,163 @@ def calc_diff(img1, img2, wave_name='sym3'):
     return angle
 
 
-def calc_spectral_clustering(label, path):
-    """path = RESP/mnist"""
-    from sklearn.manifold import SpectralEmbedding
-    from sklearn.cluster import KMeans
-    dist_sample, dist_mat = load_diffs(str(Path(path) / 'diffs' / f'diff-{label}.csv'))
+class CalcRandomCenters(object):
+    def __init__(self, corpus):
+        self._corpus = corpus
 
-    # calculating a spectral embedding
-    embedding = SpectralEmbedding(n_components=5, affinity='precomputed')
-    new_obs = embedding.fit_transform(dist_mat, dist_mat)
-    os.makedirs(str(Path(path) / 'knn'), exist_ok=True)
-    fnew_name = str(str(Path(path) / 'knn' / f'hist-{label}.csv'))
-    print(f'Histogram of distances saved to {fnew_name}')
+    def run(self):
+        loader = MnistLoad(self._corpus, DatasetKind.TRAINING)
+        data = load_sample(label, is_main=True)
+        idxs = np.random.choice(data[:,0], N_CLUSTERS, replace=False)
+        means = []
+        for ix in idxs:
+            lbl, img = loader[ix]
+            means.append(img)
+        fmeans = str(Path('RESP') / DB_PATH / 'knn' / f'means-{label}.pickle')
+        with open(fmeans, 'wb') as fh:
+            pickle.dump(means, fh)
+        print(f'Done Random means saved to {fmeans}')
 
-    # computing clusters as a way to cover this embedding
-    N_CLUSTERS = 50
-    kmeans = KMeans(n_clusters=N_CLUSTERS, init='random', precompute_distances=True, random_state=0, n_jobs=4)
-    new_clusters = kmeans.fit_predict(new_obs, new_obs)
-    print('clusters', new_clusters.shape, new_clusters.max(), new_clusters.min())
-    resp = np.column_stack((new_obs, new_clusters))
-    fnew_name = str(str(Path(path) / 'knn' / f'new3-{label}.csv'))
-    np.savetxt(fnew_name, resp, fmt='%f', delimiter=',')
-    print(f'New projection and clusters saved to {fnew_name}')
+FACTORS = {
+    'mnist': {
+        0: 0.981,
+        1: 0.987,
+        2: 0.866,
+        3: 0.879,
+        4: 0.716,
+        5: 0.68,
+        6: 0.924,
+        7: 0.842,
+        8: 0.728,
+        9: 0.831
+    },
+    'fsion' : {
+        0: 0.6,
+        1: 0.917,
+        2: 0.558,
+        3: 0.725,
+        4: 0.594,
+        5: 0.44,
+        6: 0.413,
+        7: 0.851,
+        8: 0.893,
+        9: 0.915
+    }
+}
 
-    # calculate Karcher mean of each cluster
-    means = []
-    for num_cluster in range(N_CLUSTERS):
-        idxs = np.argwhere(new_clusters == num_cluster).flatten()
-        karcher_mean = calc_karcher_mean(label, idxs, num_cluster+1)
-        means.append(karcher_mean.to_img())
-    fmeans = str(str(Path(path) / 'knn' / f'means-{label}.pickle'))
-    with open(fmeans, 'wb') as fh:
-        pickle.dump(means, fh)
-    print(f'Done Karcher means saved to {fmeans}')
+class CalcKarcherMeans(object):
+    def __init__(self, corpus, affinity, embed, means: str, knn):
+        self._corpus = corpus
+        self._embed = embed
+        self._affinity = affinity
+        if means.endswith('+'):
+            self._factor = FACTORS[corpus]
+            self._means = int(means[:-1])
+            maxf = max(self._factor.values())
+            self._factor = {k: v/maxf for k, v in self._factor.items()}
+        else:
+            self._factor = {lbl: 1.0 for lbl in range(10)}
+            self._means = int(means)
+        self._knn = knn
+        self._all_new_obvs = {}
+
+    @property
+    def _root(self) -> Path:
+        return Path('RESP') / self._corpus
+
+    def _source_diff(self, label):
+        return str(self._root / 'diffs' / f'diff-{label}.npz')
+
+    def _load_diff(self, label):
+        with np.load(self._source_diff(label)) as npz:
+            arr = npz['arr_0']
+
+        if self._affinity == 'dist':
+            max_d = arr[:, 2].max()
+            data = 1 - arr[:, 2] / max_d
+        else:
+            sigma = float(self._affinity)
+            data = np.exp(-(arr[:, 2] ** 2) / (sigma ** 2))
+
+        num_obvs = arr[:, 1].astype(int).max() + 1
+        ix = arr[:, 0].astype(int)
+        jx = arr[:, 1].astype(int)
+
+        # turn triangular sup matrix into full matrix
+        data = np.concatenate((data, data, np.ones(num_obvs)), axis=0)
+        ii = np.concatenate((ix, jx, np.array(range(num_obvs))), axis=0)
+        jj = np.concatenate((jx, ix, np.array(range(num_obvs))), axis=0)
+        arr_sparse = coo_matrix((data, (ii, jj)))
+        return arr_sparse.toarray()
+
+    def pre_run(self):
+        all_new_obvs = {}
+        for label in range(10):
+            aff_mat = self._load_diff(label)
+            if self._embed != 'no':
+                # calculating a spectral embedding
+                embedding = SpectralEmbedding(n_components=int(self._embed), affinity='precomputed')
+                new_obs = embedding.fit_transform(aff_mat, aff_mat)
+            else:
+                new_obs = aff_mat
+            all_new_obvs[label] = new_obs
+        self._all_new_obvs = all_new_obvs
+
+    def run(self):
+        self.pre_run()
+        for _ in range(10):
+            for resp in self.run1():
+                print(resp)
+
+    def run1(self):
+        means_all = {}
+
+        for label in range(10):
+            new_obs = self._all_new_obvs[label]
+
+            # computing clusters as a way to cover this embedding
+            n_clusters = int(self._means / (self._factor[label] ** 2))
+            kmeans = KMeans(n_clusters=n_clusters, init='random')
+            new_clusters = kmeans.fit_predict(new_obs, new_obs)
+            # calculate Karcher mean of each cluster
+            means = []
+            for num_cluster in range(n_clusters):
+                idxs = np.argwhere(new_clusters == num_cluster).flatten()
+                karcher_mean: DwtImg = calc_karcher_mean(self._corpus, label, idxs)
+                means.append(karcher_mean)
+            means_all[label] = means
+
+        yield self._error_on_test(means_all)
+
+    def _error_on_test(self, means_all):
+        karcher_estimator = KarcherEstimator(means_all, self._knn)
+        loader = MnistLoad(self._corpus, dataset=DatasetKind.TEST)
+        resp = []
+        t0 = datetime.now()
+        for ix in range(len(loader)):
+            true_lbl, img = loader[ix]
+            pred_lbl = karcher_estimator.predict(DwtImg(img, name=f'test-{ix}'))
+            resp.append((ix, true_lbl, pred_lbl))
+            if ix % 100 == 99:
+                print('.', end='')
+                sys.stdout.flush()
+        agv_t = (datetime.now() - t0).total_seconds() / len(loader)
+        print('')
+        resp = np.array(resp)
+        result = []
+        for lbl in range(10):
+            resp_lbl = resp[resp[:,1] == lbl,:]
+            num_lbl = resp_lbl.shape[0]
+            accurate = (resp_lbl[:,1] == resp_lbl[:,2]).sum()
+            print(f'Acur {lbl}: {accurate/num_lbl}')
+            result.append(accurate/num_lbl)
+        accurate = (resp[:, 1] == resp[:, 2]).sum()
+        result.append(accurate/resp.shape[0])
+        result.append(agv_t)
+        return result
 
 
-def calc_karcher_mean(label, idxs, num_cluster_1):
+def calc_karcher_mean(corpus, label, idxs) -> DwtImg:
     """Calculates the Riemannian centre of mass"""
 
     def get_it(ix: int) -> DwtImg:
@@ -375,15 +507,15 @@ def calc_karcher_mean(label, idxs, num_cluster_1):
         # print(repr(img), '->', f'{img @ img}')
         return img
 
-    loader = MnistLoad(DatasetKind.TRAINING)
+    loader = MnistLoad(corpus, DatasetKind.TRAINING)
     cache = {}
 
     conv_rate = 0.01
-    data = load_sample(label, is_main=True)
+    data = loader.filter_label(label)
     mu: DwtImg = get_it(0)
     epsilon, num_iter, num = 10, 0, len(idxs)
     gamma_t_1 = None
-    print(f'Karcher mean: Label {label}, Cluster#: {num_cluster_1}, Cluster size: {num}')
+    # print(f'Karcher mean: Label {label}, Cluster#: {num_cluster_1}, Cluster size: {num}')
     while epsilon > 0.0001:
         the_sum = None
         for i in range(num):
@@ -409,90 +541,78 @@ def calc_karcher_mean(label, idxs, num_cluster_1):
         # print(f'mu^2 = {mu @ mu}')
 
         gamma_t_1 = gamma_t
-        print(f'{num_iter}: {epsilon}')
+        # print(f'{num_iter}: {epsilon}')
     return mu
-
-
-def error_on_test(k):
-    karcher_estimator = KarcherEstimator(k)
-    loader = MnistLoad(dataset=DatasetKind.TEST)
-    resp = []
-    err_sum = 0
-    for ix in range(len(loader)):
-        true_lbl, img = loader[ix]
-        pred_lbl = karcher_estimator.predict(DwtImg(img, name=f'test-{ix}'))
-        resp.append((ix, true_lbl, pred_lbl))
-        if true_lbl != pred_lbl:
-            err_sum += 1
-        if ix % 100 == 99:
-            print('.', end='')
-            sys.stdout.flush()
-    print('')
-    print(f'Error rate: {100 * err_sum/len(loader)}%')
-    resp = np.array(resp)
-    ftest = str(Path(EXP_PATH) / 'knn' / 'test-results.csv')
-    np.savetxt(ftest, resp, fmt='%f', delimiter=',')
-    print(f'Results {ftest} generated')
-
-
-def load_diffs(fname) -> Tuple[np.ndarray, np.ndarray]:
-    df = pd.read_csv(fname, header=1, delimiter=',')
-    arr = df.values
-    max_d = arr[:,4].max()
-    dist_sample = np.array([v for v in arr[:,4] if random() < 0.001])
-    num_obvs = arr[:,3].astype(int).max() + 1
-    data = 1 - arr[:,4]/max_d
-    ix = arr[:, 2].astype(int)
-    jx = arr[:, 3].astype(int)
-    # append diagonal of 1's
-    data = np.concatenate((data, np.ones(num_obvs)), axis=0)
-    ix = np.concatenate((ix, np.array(range(num_obvs))), axis=0)
-    jx = np.concatenate((jx, np.array(range(num_obvs))), axis=0)
-    arr_sparse = coo_matrix((data, (ix, jx)))
-    print(f'sparse shape {arr_sparse.shape}; orig max {num_obvs}')
-    return dist_sample, arr_sparse.toarray()
 
 
 def load_sample(label, is_main):
     prefix = 'label' if is_main else 'other'
+    #print('Load labels', str(Path(EXP_PATH) / 'labels'))
     fname = str(Path(EXP_PATH) / 'labels' / f'{prefix}-{label}.csv')
     df = pd.read_csv(fname, header=None, delimiter=',', names=['x'])
-    print(f'{prefix}-{label} = {df.values.shape} - min {df.values.min()}, max {df.values.max()}')
+    #print(f'{prefix}-{label} = {df.values.shape} - min {df.values.min()}, max {df.values.max()}')
     return df.values
 
 
-def calc_labels():
-    loader = MnistLoad(DatasetKind.TRAINING)
-    num = len(loader)
-    fdiffdir = Path('RESP') / 'mnist' / 'labels'
-    ensure_dir(fdiffdir)
-    with LabelFilesWriter(fdiffdir) as csvs:
-        for num in range(num):
-            lbl1 = loader.get_label(num)
-            lbl1 = int(lbl1)
-            csvs.writerow(lbl1, [num])
+class CalcLabels(object):
+
+    def __init__(self, corpus):
+        self._corpus = corpus
+
+    def run(self):
+        loader = MnistLoad(self._corpus, DatasetKind.TRAINING)
+        self._ensure_dir()
+
+        for lbl in range(10):
+
+            # save in-set positions
+            arr = loader.filter_label(lbl)
+            fdest = self._dest_label(lbl)
+            np.savez(fdest, arr)
+
+            # save not in-set positions (a sample)
+            others = loader.filter_no_label(lbl)
+            size = int(0.1 * len(others))
+            others_arr = np.random.choice(others, size=size, replace=False)
+            fdest = self._dest_others(lbl)
+            np.savez(fdest, others_arr)
+
+    def _ensure_dir(self):
+        ensure_dir(self._root)
+
+    @property
+    def _root(self) -> Path:
+        return Path('RESP') / self._corpus / 'labels'
+
+    def _dest_label(self, lbl):
+        return str(self._root / f'label-{lbl}.npz')
+
+    def _dest_others(self, lbl):
+        return str(self._root / f'other-{lbl}.npz')
 
 
-def calc_labels_others(path):
-    import pandas as pd
-    fdir = Path('RESP') / path / 'labels'
-    arrs = {}
-    for label in range(10):
-        fname = fdir / f'label-{label}.csv'
-        df = pd.read_csv(fname, header=1, delimiter=',')
-        arrs[label] = df.values
-    for label in range(10):
-        samples = []
-        for other_label in range(10):
-            if other_label == label:
-                continue
-            size = int(0.1 * len(arrs[other_label]))
-            sample = np.random.choice(arrs[other_label][:,0], size=size, replace=False)
-            samples.append(sample)
-        resp = np.concatenate(tuple(samples), axis=0)
-        fnew_name = str(fdir / f'other-{label}.csv')
-        np.savetxt(fnew_name, resp, fmt='%f', delimiter=',')
-        print(f'{fnew_name} generated, {resp.shape[0]} points')
+class ConvertDiffs(object):
+
+    def __init__(self, corpus):
+        self._corpus = corpus
+
+    def run(self):
+        for lbl in range(10):
+            print(self._source(lbl), '->', self._dest(lbl))
+            df = pd.read_csv(self._source(lbl))
+            arr = df.values
+            arr = arr[:, 2:]
+            np.savez_compressed(self._dest(lbl), arr)
+
+    @property
+    def _root(self) -> Path:
+        return Path('RESP') / self._corpus / 'diffs'
+
+    def _source(self, lbl):
+        return str(self._root / f'diff-{lbl}.csv')
+
+    def _dest(self, lbl):
+        return str(self._root / f'diff-{lbl}.npzz')
 
 
 def calc_diffs_all(label, wave_name):
@@ -503,7 +623,7 @@ def calc_diffs_all(label, wave_name):
     :return:
     """
     loader = MnistLoad(DatasetKind.TRAINING)
-    fdiffname = Path('RESP') / 'mnist' / 'diffs' / ('diff-%s.csv' % label)
+    fdiffname = Path('RESP') / DB_PATH / 'diffs' / ('diff-%s.csv' % label)
     ensure_dir(fdiffname.parent)
     total, label = 0, int(label)
     with open(str(fdiffname), 'wt') as fh:
