@@ -261,16 +261,18 @@ def batch_mnist_karcher(corpus):
         def calc_seconds(self):
             pre_run = 120
             karcher_means = 120
-            test_1 = 0.000077
+            test_1 = 0.0004
             # test_1 = time to compute 1 distance
             # nmeans * 10 ; number of images to compare for k-nn
             # * 10000 ; number of test images
             # * 10 ; number of runs
-            estimate = test_1 * self._nmeans * 10 * 10000 * 10 + pre_run + karcher_means
+            estimate = test_1 * int(self._nmeans) * 10 * 10000 * 5 + pre_run + karcher_means
+            if estimate > 3600 * 10:
+                raise RuntimeError(f'too much time {estimate/3600}')
             return estimate * 1.2
 
         def write_plan(self):
-            self._plan_name = str(self.root / self.basename('plan', '.pbs'))
+            self._plan_name = str(self.root / self.basename('plan', 'pbs'))
             with open(self._plan_name, 'wt') as fh:
                 plan = PLAN % {'exp_dir': f'{corpus}/R01'}
                 fname_result = (self.root / self.basename('test', 'csv')).absolute()
@@ -285,7 +287,7 @@ def batch_mnist_karcher(corpus):
     affinities = ['dist', '0.2', '0.4', '0.6', '0.8', '1.0']
     embeddings = ['no', '3', '8', '21']
     means = ['25', '50', '75', '125', '175']
-    for aff, embed, nmeans in itt.product((affinities, embeddings, means)):
+    for aff, embed, nmeans in itt.product(affinities, embeddings, means):
         task = GenErrors(corpus, aff, embed, nmeans, 1)
         plan_name = task.write_plan()
         plan_id = f'{corpus}_{aff}_{embed}_{nmeans}_1'
@@ -294,7 +296,7 @@ def batch_mnist_karcher(corpus):
         plan_secs = 900 * (int(plan_secs / 900) + 1)
         args, cwd = popen_args(plan_name, plan_id, timedelta(seconds=plan_secs))
         print(' '.join(args))
-        # subprocess.call(args)
+        subprocess.call(args)
 
 class JobList(object):
     def __init__(self, job_name, exp_dir, headers, time_func, plan_name_func, fname_func, job_max_hours=6):

@@ -453,7 +453,7 @@ class CalcKarcherMeans(object):
             writer.writerow(
                 ['']
             )
-            for _ in range(10):
+            for _ in range(5):
                 for resp in self.run1():
                     writer.writerow(resp)
 
