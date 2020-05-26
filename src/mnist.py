@@ -355,6 +355,7 @@ class CalcRandomCenters(object):
             pickle.dump(means, fh)
         print(f'Done Random means saved to {fmeans}')
 
+# for unbalanced landmarks based on 25 means results
 FACTORS = {
     'mnist': {
         0: 0.981,
@@ -383,7 +384,7 @@ FACTORS = {
 }
 
 class CalcKarcherMeans(object):
-    def __init__(self, corpus, affinity, embed, means: str, knn):
+    def __init__(self, corpus, affinity, embed, means: str, knn, fname):
         self._corpus = corpus
         self._embed = embed
         self._affinity = affinity
@@ -396,6 +397,7 @@ class CalcKarcherMeans(object):
             self._factor = {lbl: 1.0 for lbl in range(10)}
             self._means = int(means)
         self._knn = knn
+        self._fname = fname
         self._all_new_obvs = {}
 
     @property
@@ -427,7 +429,8 @@ class CalcKarcherMeans(object):
         arr_sparse = coo_matrix((data, (ii, jj)))
         return arr_sparse.toarray()
 
-    def pre_run(self):
+    def _pre_run(self):
+        t0 = datetime.now()
         all_new_obvs = {}
         for label in range(10):
             aff_mat = self._load_diff(label)
@@ -439,16 +442,25 @@ class CalcKarcherMeans(object):
                 new_obs = aff_mat
             all_new_obvs[label] = new_obs
         self._all_new_obvs = all_new_obvs
+        tot = (datetime.now() - t0).total_seconds()
+        # usually : 70 secs
+        print(f'pre_run = {tot} secs')
 
     def run(self):
-        self.pre_run()
-        for _ in range(10):
-            for resp in self.run1():
-                print(resp)
+        self._pre_run()
+        with open(self._fname, 'wt') as fh:
+            writer = csv.writer(fh)
+            writer.writerow(
+                ['']
+            )
+            for _ in range(10):
+                for resp in self.run1():
+                    writer.writerow(resp)
 
     def run1(self):
         means_all = {}
 
+        t0 = datetime.now()
         for label in range(10):
             new_obs = self._all_new_obvs[label]
 
@@ -463,6 +475,8 @@ class CalcKarcherMeans(object):
                 karcher_mean: DwtImg = calc_karcher_mean(self._corpus, label, idxs)
                 means.append(karcher_mean)
             means_all[label] = means
+        tot = (datetime.now() - t0).total_seconds()
+        print(f'karcher_means = {tot} secs')
 
         yield self._error_on_test(means_all)
 
@@ -471,26 +485,26 @@ class CalcKarcherMeans(object):
         loader = MnistLoad(self._corpus, dataset=DatasetKind.TEST)
         resp = []
         t0 = datetime.now()
+        mat = {(lbl_i, lbl_j): 0 for lbl_i in range(10) for lbl_j in range(10)}
         for ix in range(len(loader)):
             true_lbl, img = loader[ix]
             pred_lbl = karcher_estimator.predict(DwtImg(img, name=f'test-{ix}'))
             resp.append((ix, true_lbl, pred_lbl))
+            mat[true_lbl, pred_lbl] += 1
             if ix % 100 == 99:
                 print('.', end='')
                 sys.stdout.flush()
-        agv_t = (datetime.now() - t0).total_seconds() / len(loader)
+        avg_t = (datetime.now() - t0).total_seconds() / len(loader)
         print('')
         resp = np.array(resp)
-        result = []
-        for lbl in range(10):
-            resp_lbl = resp[resp[:,1] == lbl,:]
-            num_lbl = resp_lbl.shape[0]
-            accurate = (resp_lbl[:,1] == resp_lbl[:,2]).sum()
-            print(f'Acur {lbl}: {accurate/num_lbl}')
-            result.append(accurate/num_lbl)
-        accurate = (resp[:, 1] == resp[:, 2]).sum()
-        result.append(accurate/resp.shape[0])
-        result.append(agv_t)
+        tot_i = [sum(mat[lbl_i, lbl_j] for lbl_j in range(10)) for lbl_i in range(10)]
+        accurate = sum([mat[lbl_i, lbl_i] for lbl_i in range(10)])
+        result = (
+            [mat[lbl_i, lbl_j] for lbl_i in range(10) for lbl_j in range(10)]
+            + [mat[lbl_i,lbl_i]/tot_i for lbl_i, tot_i in enumerate(tot_i)]
+            + [accurate/resp.shape[0], avg_t]
+        )
+        print('Test =', avg_t * len(loader), 'secs')
         return result
 
 

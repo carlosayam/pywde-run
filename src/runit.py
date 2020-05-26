@@ -334,10 +334,11 @@ def mnist_diffs(label, **kwargs):
 @click.argument('embed', type=click.Choice(['no', '3', '5', '8', '13']))
 @click.argument('means')
 @click.argument('knn', type=int)
-def mnist_karcher(corpus, affinity, embed, means, knn):
+@click.argument('fname')
+def mnist_karcher(corpus, affinity, embed, means, knn, fname):
     "Calculate the image metrics for a label"
     from mnist import CalcKarcherMeans
-    CalcKarcherMeans(corpus, affinity, embed, means, knn).run()
+    CalcKarcherMeans(corpus, affinity, embed, means, knn, fname).run()
 
 
 @main.command()
