@@ -294,6 +294,17 @@ def exp02_geyser(directory):
 
 
 @main.command()
+@click.argument('corpus', type=click.Choice(['mnist', 'fsion']))
+@click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
+def mnist_tex(corpus, directory):
+    """generates the results """
+    from mnist import TexResults
+    from os.path import expanduser
+    TexResults(corpus, expanduser(directory)).run()
+
+
+
+@main.command()
 @click.argument('directory', type=click.Path(file_okay=False, dir_okay=True))
 def exp02_repl(directory):
     "Reads all *.tab files in [DIRECTORY] and produces corresponding plots in there"
@@ -330,7 +341,7 @@ def mnist_diffs(label, **kwargs):
 
 @main.command()
 @click.argument('corpus')
-@click.argument('affinity', type=click.Choice(['dist', '0.2', '0.4', '0.6', '0.8', '1.0']))
+@click.argument('affinity', type=click.Choice(['dist', '0.2', '0.4', '0.6', '0.8', '1.0', '2.0', '3.0']))
 @click.argument('embed', type=click.Choice(['no', '3', '5', '8', '13']))
 @click.argument('means')
 @click.argument('knn', type=int)
@@ -339,6 +350,7 @@ def mnist_karcher(corpus, affinity, embed, means, knn, fname):
     "Calculate the image metrics for a label"
     from mnist import CalcKarcherMeans
     CalcKarcherMeans(corpus, affinity, embed, means, knn, fname).run()
+
 
 
 @main.command()

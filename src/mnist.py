@@ -5,6 +5,7 @@ import pywt
 import math
 import pickle
 import sys
+import itertools as itt
 from collections import defaultdict
 from pathlib import Path
 from datetime import datetime
@@ -506,6 +507,94 @@ class CalcKarcherMeans(object):
         )
         print('Test =', avg_t * len(loader), 'secs')
         return result
+
+
+class TexResults(object):
+    def __init__(self, corpus, directory):
+        self._corpus = corpus
+        self._directory = directory
+
+    def _load(self, means, continued):
+        def aff_tex(aff):
+            if aff == 'dist':
+                return 'Linear'
+            else:
+                return aff
+        affinities = ['dist', '0.2', '0.4', '0.6', '0.8', '1.0']
+        embeddings = ['3', '8', '21']
+        data = dict(
+            CorpusName=self._corpus,
+            Corpus=self._corpus
+        )
+        items = []
+        itemNum = 0
+        for nmeans in means:
+            firstKM = True
+            for aff in affinities:
+                firstAffinity = True
+                for embed in embeddings:
+                    item = {
+                        'KM': nmeans,
+                        'FirstKM': firstKM,
+                        'Affinity': aff_tex(aff),
+                        'FirstAffinity': firstAffinity,
+                        'EmbedP': embed
+                    }
+                    acc = self._load_data(nmeans, aff, embed)
+                    for lbl in range(10):
+                        item[f'Accur{lbl}'] = '%0.3f' % acc[lbl]
+                    item['AccurAll'] = '%0.3f' % acc['all']
+                    if itemNum % 18 == 17:
+                        item['Border'] = '\hline'
+                    elif itemNum % 3 == 2:
+                        item['Border'] = '\cline{2-14}'
+                    else:
+                        item['Border'] = '\cline{3-14}'
+                    items.append(item)
+                    itemNum += 1
+                    firstKM = False
+                    firstAffinity = False
+        data['Items'] = items
+        data['Continued'] = continued
+        print(len(items))
+        return data
+
+    def run(self):
+        import pystache as ps
+        with open('src/ch5-results.tex', 'rt') as fh:
+            tpl = ps.parse("\n".join(fh.readlines()), delimiters=('<<', '>>'))
+        directory = Path(self._directory)
+        means_pages = [
+            ['25', '50', '75'],
+            ['125', '175']
+        ]
+        for ix, means in enumerate(means_pages):
+            data = self._load(means, ix > 0)
+            fname = (directory / f'ch5-results-{self._corpus}-{ix}.tex').absolute()
+            with open(fname, 'wt') as fh:
+                fh.write('%% auto generated %%\n')
+                fh.write('%% corpus = %s\n' % self._corpus)
+                for line in ps.Renderer().render(tpl, **data).splitlines():
+                    line = line.rstrip()
+                    if line:
+                        fh.write(line)
+                        fh.write('\n')
+            print(fname, 'generated')
+
+    def _load_data(self, nmeans, aff, embed):
+        basename = f'test_{aff}_{embed}_{nmeans}_1.csv'
+        fname = Path('RESP') / self._corpus / 'R01' / basename
+        names = (
+            [f'mat_{i}_{j}' for i in range(10) for j in range(10)]
+            + [f'acc_{i}' for i in range(10)]
+            + ['acc_all', 'avg_time']
+        )
+        df = pd.read_csv(fname.absolute(), delimiter=',', skiprows=1, names=names)
+        resp = {}
+        for lbl in range(10):
+            resp[lbl] = df[f'acc_{lbl}'].mean()
+        resp['all'] = df['acc_all'].mean()
+        return resp
 
 
 def calc_karcher_mean(corpus, label, idxs) -> DwtImg:
