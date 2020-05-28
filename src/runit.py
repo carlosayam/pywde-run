@@ -339,10 +339,45 @@ def mnist_diffs(label, **kwargs):
     calc_diffs_all(label, kwargs['wave'])
 
 
+class _StringOrType(click.ParamType):
+    name = "affinity"
+
+    def __init__(self, name, no_num, num_type, cond=None):
+        self.name = name
+        self.no_num = no_num
+        self.num_type =  num_type
+        self.cond = cond
+
+    def convert(self, value, param, ctx):
+        try:
+            if value == self.no_num:
+                return ('nonum', value)
+            resp = self.num_type(value)
+            if self.cond is not None:
+                if self.cond(resp):
+                    return ('num', resp)
+                raise ValueError()
+            else:
+                return ('num', resp)
+        except TypeError:
+            self.fail(
+                f"expected `{self.no_num}` or a {self.num_type.__name__}, got "
+                f"{value!r} of type {type(value).__name__}",
+                param,
+                ctx,
+            )
+        except ValueError:
+            self.fail(f"{value!r} must be `dist` or a positive float", param, ctx)
+
+
+AffinityType = _StringOrType('affinity', 'dist', float, cond=lambda v: v > 0)
+EmbedType = _StringOrType('embedding', 'no', int, cond=lambda v: v > 0)
+CorpusType = click.Choice(['mnist', 'fsion'])
+
 @main.command()
-@click.argument('corpus')
-@click.argument('affinity', type=click.Choice(['dist', '0.2', '0.4', '0.6', '0.8', '1.0', '2.0', '3.0']))
-@click.argument('embed', type=click.Choice(['no', '3', '5', '8', '13']))
+@click.argument('corpus', type=CorpusType)
+@click.argument('affinity', type=AffinityType)
+@click.argument('embed', type=EmbedType)
 @click.argument('means')
 @click.argument('knn', type=int)
 @click.argument('fname')
@@ -350,6 +385,15 @@ def mnist_karcher(corpus, affinity, embed, means, knn, fname):
     "Calculate the image metrics for a label"
     from mnist import CalcKarcherMeans
     CalcKarcherMeans(corpus, affinity, embed, means, knn, fname).run()
+
+
+@main.command()
+@click.argument('corpus', type=CorpusType)
+@click.argument('fname')
+def mnist_manigauss(corpus, fname):
+    "Calculate the image metrics for a label"
+    from mnist import CalcMMDG
+    CalcMMDG(corpus, fname).run()
 
 
 
@@ -374,12 +418,13 @@ def mnist_knn(k):
 
 
 @main.command()
+@click.argument('corpus', type=click.Choice(('mnist', 'fsion')))
 @click.argument('img1', type=int)
 @click.argument('img2', type=int)
-def mnist_test(img1, img2):
+def mnist_test(corpus, img1, img2):
     "Calculate log_img1 (img2)"
     from mnist import MnistLoad, DatasetKind, DwtImg
-    loader = MnistLoad(DatasetKind.TRAINING)
+    loader = MnistLoad(corpus, DatasetKind.TRAINING)
     obj1 = DwtImg(loader.get_image(img1))
     obj2 = DwtImg(loader.get_image(img2))
     import code

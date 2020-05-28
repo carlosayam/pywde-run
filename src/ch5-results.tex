@@ -1,56 +1,68 @@
-\begin{table}[h]
-	\fontsize{7}{10}\selectfont
-	\centering
-	\begin{minipage}[t]{0.95\textwidth}
-		\centering
-		\begin{tabular}{|r|r|r|r|r|r|r|r|r|r|r|r|r|r|}
-			\hline
-			\textbf{KM} & \textbf{Affinity} & $R^p$
-			& \textbf{$0$} & \textbf{$1$} & \textbf{$2$} & \textbf{$3$} & \textbf{$4$}
-			& \textbf{$5$} & \textbf{$6$} & \textbf{$7$} & \textbf{$8$} & \textbf{$9$}
-			& \textbf{Total} \\
-			\hline
-			<<#Items>>
-			<<#FirstKM>>
-			\multirow{12}{*}{<<KM>>} &
-			<</FirstKM>>
-			<<^FirstKM>>
-			&
-			<</FirstKM>>
-			<<#FirstAffinity>>
-			\multirow{2}{*}{<<Affinity>>} &
-			<</FirstAffinity>>
-			<<^FirstAffinity>>
-			&
-			<</FirstAffinity>>
-			<<EmbedP>> &
-			<<Accur0>> &
-			<<Accur1>> &
-			<<Accur2>> &
-			<<Accur3>> &
-			<<Accur4>> &
-			<<Accur5>> &
-			<<Accur6>> &
-			<<Accur7>> &
-			<<Accur8>> &
-			<<Accur9>> &
-			<<AccurAll>>
-			\\
-			<<Border>>
-			<</Items>>
-		\end{tabular}
-	\end{minipage}
-	<<#Continued>>
-    \caption[Accuracy of landmark $k$-NN over <<CorpusName>> with different algorithmic choices (contd.)]
-	{Accuracy of landmark $k$-NN over <<CorpusName>> with different algorithmic choices (contd.)}
-	<</Continued>>
-	<<^Continued>>
-    \caption[Accuracy of landmark $k$-NN over <<CorpusName>> with different algorithmic choices]
+\begin{center}
+\fontsize{7}{10}\selectfont
+\begin{longtable}{|r|r|r|r|r|r|r|r|r|r|r|r|r|r|}
+\hline
+    \textbf{KM} & \textbf{Affinity} & $R^p$
+    & \textbf{$0$} & \textbf{$1$} & \textbf{$2$} & \textbf{$3$} & \textbf{$4$}
+    & \textbf{$5$} & \textbf{$6$} & \textbf{$7$} & \textbf{$8$} & \textbf{$9$}
+    & \textbf{Total} \\
+\hline
+\endfirsthead
+
+\multicolumn{14}{c}{{\bfseries \tablename\ \thetable{} -- continued from previous page}} \\
+\hline
+    \textbf{KM} & \textbf{Affinity} & $R^p$
+    & \textbf{$0$} & \textbf{$1$} & \textbf{$2$} & \textbf{$3$} & \textbf{$4$}
+    & \textbf{$5$} & \textbf{$6$} & \textbf{$7$} & \textbf{$8$} & \textbf{$9$}
+    & \textbf{Total} \\
+\hline
+\endhead
+
+\hline \multicolumn{14}{|r|}{{Continued on next page}} \\ \hline
+\endfoot
+
+\hline \hline
+\endlastfoot
+
+    <<#Items>>
+    <<#FirstKM>>
+    \multirow{12}{*}{<<KM>>} &
+    <</FirstKM>>
+    <<^FirstKM>>
+    &
+    <</FirstKM>>
+    <<#FirstAffinity>>
+    \multirow{2}{*}{<<Affinity>>} &
+    <</FirstAffinity>>
+    <<^FirstAffinity>>
+    &
+    <</FirstAffinity>>
+    <<EmbedP>> &
+    <<Accur0>> &
+    <<Accur1>> &
+    <<Accur2>> &
+    <<Accur3>> &
+    <<Accur4>> &
+    <<Accur5>> &
+    <<Accur6>> &
+    <<Accur7>> &
+    <<Accur8>> &
+    <<Accur9>> &
+    <<AccurAll>>
+    <<#LastKM>>
+    \\
+    <</LastKM>>
+    <<^LastKM>>
+    \\*
+    <</LastKM>>
+    <<Border>>
+    <</Items>>
+	\caption[Accuracy of landmark $k$-NN over <<CorpusName>> with different algorithmic choices]
 	{Accuracy of landmark $k$-NN over <<CorpusName>> with different algorithmic choices. \textbf{KM} is the
 	number of Karcher means used in each image class. \textbf{Affinity} is either {\it linear} or of quadratic
 	exponential decay with given sigma. $R^p$ list the number of dimensions in the spectral embedding projection.
 	Columns $0$ to $9$ the corresponding accuracy, with the overall accuracy in the column \textbf{total}
 	}
 	\label{tab:<<Corpus>>Accuracy}
-	<</Continued>>
-\end{table}
+\end{longtable}
+\end{center}

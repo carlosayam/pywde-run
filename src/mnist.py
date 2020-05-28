@@ -246,6 +246,19 @@ class DwtImg(object):
         resp = f'[DwtImg name={self.name} {resp}]'
         return resp
 
+    @property
+    def shape(self):
+        resp = []
+        for ix, cc in enumerate(self.wdec):
+            if type(cc) == tuple:
+                items = []
+                for pos, coefs in zip(['LH', 'HL', 'HH'], cc):
+                    items.append((pos, coefs.shape))
+                resp.append(items)
+            else:
+                resp.append(cc.shape)
+        return resp
+
     @staticmethod
     def scalar_mult(obj, fnum):
         """Strictly speaking, this returns an object outside the hyper-sphere $|x| = 1$"""
@@ -264,12 +277,16 @@ class DwtImg(object):
         obj.wdec = resp
         return obj
 
-    def calc_angle(self, other: 'DwtImg') -> float:
+    def calc_angle(self, other: 'DwtImg', index_set=None) -> float:
         tot, norm2_1, norm2_2 = 0.0, 0.0, 0.0
-        for c1, c2 in zip(self.wdec, other.wdec):
+        for ix, (c1, c2) in enumerate(zip(self.wdec, other.wdec)):
+            if index_set is not None and ix not in index_set:
+                continue
             if type(c1) == tuple:
                 # TODO check types/arguments
-                for det_coeff1, det_coeff2 in zip(c1, c2):
+                for ix_d, (det_coeff1, det_coeff2) in enumerate(zip(c1, c2)):
+                    if index_set is not None and (ix, ix_d) not in index_set:
+                        continue
                     tot += (det_coeff1 * det_coeff2).sum()
                     norm2_1 += (det_coeff1 * det_coeff1).sum()
                     norm2_2 += (det_coeff2 * det_coeff2).sum()
@@ -278,7 +295,8 @@ class DwtImg(object):
                 norm2_1 += (c1 * c1).sum()
                 norm2_2 += (c2 * c2).sum()
         # print(f'{tot}, {norm2_1}, {norm2_2}, {math.sqrt(norm2_1 * norm2_2)}')
-        resp = math.acos(min(tot / math.sqrt(norm2_1 * norm2_2), 1.0))
+        cos_v = tot / math.sqrt(norm2_1 * norm2_2)
+        resp = math.acos(max(min(cos_v, 1.0), -1.0))
         return resp
 
 
@@ -319,7 +337,7 @@ class KarcherEstimator(object):
         resp = []
         for lbl, means in self._means.items():
             for kmean in means:
-                dist = img.calc_angle(kmean)
+                dist = img.calc_angle(kmean, index_set={0, 1, (1,0), (1,1), (1,2)})
                 resp.append((dist, lbl))
         resp = sorted(resp, key=lambda tup: tup[0])[:self._k]
         counter = defaultdict(lambda: 0)
@@ -356,6 +374,37 @@ class CalcRandomCenters(object):
             pickle.dump(means, fh)
         print(f'Done Random means saved to {fmeans}')
 
+
+class CalcMMDG(object):
+    # Manifold Mixture of Directional Gaussians
+    def __init__(self, corpus, fname):
+        self._corpus = corpus
+        self._fname = fname
+
+    def run(self):
+        loader = MnistLoad(self._corpus, DatasetKind.TRAINING)
+        self._load_diff(0)
+        pass
+
+    @property
+    def _root(self) -> Path:
+        return Path('RESP') / self._corpus
+
+    def _source_diff(self, label):
+        return str(self._root / 'diffs' / f'diff-{label}.npz')
+
+    def _load_diff(self, label):
+        with np.load(self._source_diff(label)) as npz:
+            arr = npz['arr_0']
+        import code
+        code.interact('**', local={'np': np, **locals()})
+
+
+
+
+
+
+
 # for unbalanced landmarks based on 25 means results
 FACTORS = {
     'mnist': {
@@ -387,8 +436,8 @@ FACTORS = {
 class CalcKarcherMeans(object):
     def __init__(self, corpus, affinity, embed, means: str, knn, fname):
         self._corpus = corpus
-        self._embed = embed
-        self._affinity = affinity
+        self._embed = embed[1]
+        self._affinity = affinity[1]
         if means.endswith('+'):
             self._factor = FACTORS[corpus]
             self._means = int(means[:-1])
@@ -514,7 +563,7 @@ class TexResults(object):
         self._corpus = corpus
         self._directory = directory
 
-    def _load(self, means, continued):
+    def _load(self):
         def aff_tex(aff):
             if aff == 'dist':
                 return 'Linear'
@@ -522,6 +571,7 @@ class TexResults(object):
                 return aff
         affinities = ['dist', '0.2', '0.4', '0.6', '0.8', '1.0']
         embeddings = ['3', '8', '21']
+        means = ['25', '50', '75', '125', '175']
         data = dict(
             CorpusName=self._corpus,
             Corpus=self._corpus
@@ -530,6 +580,7 @@ class TexResults(object):
         itemNum = 0
         for nmeans in means:
             firstKM = True
+            lastKM = False
             for aff in affinities:
                 firstAffinity = True
                 for embed in embeddings:
@@ -544,6 +595,7 @@ class TexResults(object):
                     for lbl in range(10):
                         item[f'Accur{lbl}'] = '%0.3f' % acc[lbl]
                     item['AccurAll'] = '%0.3f' % acc['all']
+                    item['LastKM'] = itemNum % 18 == 17
                     if itemNum % 18 == 17:
                         item['Border'] = '\hline'
                     elif itemNum % 3 == 2:
@@ -555,7 +607,6 @@ class TexResults(object):
                     firstKM = False
                     firstAffinity = False
         data['Items'] = items
-        data['Continued'] = continued
         print(len(items))
         return data
 
@@ -564,22 +615,17 @@ class TexResults(object):
         with open('src/ch5-results.tex', 'rt') as fh:
             tpl = ps.parse("\n".join(fh.readlines()), delimiters=('<<', '>>'))
         directory = Path(self._directory)
-        means_pages = [
-            ['25', '50', '75'],
-            ['125', '175']
-        ]
-        for ix, means in enumerate(means_pages):
-            data = self._load(means, ix > 0)
-            fname = (directory / f'ch5-results-{self._corpus}-{ix}.tex').absolute()
-            with open(fname, 'wt') as fh:
-                fh.write('%% auto generated %%\n')
-                fh.write('%% corpus = %s\n' % self._corpus)
-                for line in ps.Renderer().render(tpl, **data).splitlines():
-                    line = line.rstrip()
-                    if line:
-                        fh.write(line)
-                        fh.write('\n')
-            print(fname, 'generated')
+        data = self._load()
+        fname = (directory / f'ch5-results-{self._corpus}.tex').absolute()
+        with open(fname, 'wt') as fh:
+            fh.write('%% auto generated %%\n')
+            fh.write('%% corpus = %s\n' % self._corpus)
+            for line in ps.Renderer().render(tpl, **data).splitlines():
+                line = line.rstrip()
+                if line:
+                    fh.write(line)
+                    fh.write('\n')
+        print(fname, 'generated')
 
     def _load_data(self, nmeans, aff, embed):
         basename = f'test_{aff}_{embed}_{nmeans}_1.csv'
